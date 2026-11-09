@@ -708,7 +708,9 @@ never counts.
 settles `v` normalisation (27/28 → 0/1) and that `malleability_flag: false` recovers the key;
 no retry with `true` was needed. `near-sdk`'s unit-test mock implements `ecrecover`, so this
 runs without a sandbox. Re-point T3 at the live capture once `NEARAI_API_KEY` exists — the
-assertions do not change.
+assertions do not change, and `npm run capture --workspace @correlation/api` does the re-pointing:
+it calls the model once for policy 1 / agent index 2, verifies the signature before writing, and
+refuses if the verdict is wrong or the signature is not `provider_tee`.
 
 ---
 

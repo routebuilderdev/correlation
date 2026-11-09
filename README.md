@@ -25,6 +25,17 @@ Contract tests need the Rust 1.99 toolchain pinned in `contract/rust-toolchain.t
 cd contract && cargo test && cargo build --release --target wasm32-unknown-unknown
 ```
 
+With the key in `.env`, one command replaces the synthetic fixture with a real, verified capture:
+
+```bash
+npm run capture --workspace @correlation/api
+```
+
+It makes one completion at policy 1 / agent index 2, verifies the signature locally, refuses to
+write if the model answered wrongly or the signature is not `provider_tee`, then rewrites
+`request.bin`, `response.bin`, `signature.json` and `signer.json`. After that, `cargo test` verifies
+T3 against bytes the model TEE actually signed.
+
 ## The 60-second demo
 
 1. Open `http://localhost:5173`. The policy panel shows 10 NEAR limit, 1 NEAR premium,
@@ -118,7 +129,7 @@ Deployment is not done yet: this machine has neither `near-cli` nor a funded tes
 |---|---|---|
 | `contract` (Rust) | 42 | signature path, policy terms, pool limits, receipts (bare + envelope verdicts), index, claim, expiry, full 20-receipt run |
 | `shared` | 10 | cross-language vectors pinned to the Rust fixture |
-| `api` | 20 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim, a full offline 20-agent run |
+| `api` | 18 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim, a full offline 20-agent run |
 
 `shared` and `api` deliberately assert the *same* error codes as the contract (`E07`, `E09`, `E10`,
 `E11`), so a divergence shows up as a failing test instead of a silent client-only pass.

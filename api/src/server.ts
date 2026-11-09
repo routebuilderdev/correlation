@@ -153,6 +153,37 @@ export function buildServer(deps: Deps): FastifyInstance {
     }
   });
 
+  /** Optional progress stream (§7.5): same shape as the poll, pushed. */
+  app.get<{ Params: { id: string } }>("/api/runs/:id/stream", (request, reply) => {
+    const run = runs.get(request.params.id);
+    if (!run) return reply.status(404).send({ error: "unknown run" });
+
+    reply.raw.writeHead(200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache",
+      connection: "keep-alive",
+      "access-control-allow-origin": "*",
+    });
+
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = undefined;
+    };
+    const send = () => {
+      reply.raw.write(`data: ${JSON.stringify(publicRun(run))}\n\n`);
+      if (run.status === "triggered" || run.status === "error") {
+        stop();
+        reply.raw.end();
+      }
+    };
+
+    timer = setInterval(send, 500);
+    request.raw.on("close", stop);
+    send();
+    return reply;
+  });
+
   app.get<{ Params: { id: string } }>("/api/runs/:id", async (request, reply) => {
     const run = runs.get(request.params.id);
     if (!run) return reply.status(404).send({ error: "unknown run" });
