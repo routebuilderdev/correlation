@@ -101,7 +101,11 @@ export async function verifyLocally(
   if (typeof record.text !== "string" || typeof record.signature !== "string") {
     throw new ReceiptError("E06", "BAD_SIGNATURE_JSON");
   }
-  if (record.signature_kind !== "provider_tee") {
+  // Direct model endpoints return only text/signature/signing_address/signing_algo:
+  // the serving enclave *is* the provider, so the field is absent rather than
+  // "provider_tee". An explicit "gateway" is still refused — the gateway signs
+  // "<req>:<resp>" without the model prefix, and we never point at it.
+  if (record.signature_kind !== undefined && record.signature_kind !== "provider_tee") {
     throw new ReceiptError(
       "E07",
       `NOT_PROVIDER_TEE: signature_kind=${record.signature_kind}`,

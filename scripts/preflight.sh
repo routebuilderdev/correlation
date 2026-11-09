@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Say exactly what is missing before a demo, with the command that fixes it.
 #
-#   ./scripts/preflight.sh            check what can be checked offline + RPC + key
+#   ./scripts/preflight.sh            offline + RPC + key validity (no tokens spent)
 #   ./scripts/preflight.sh --no-net   offline only
+#   ./scripts/preflight.sh --deep     also make one real 1-token completion
 #
 # Exit 0 means every required item is present.
 set -uo pipefail
@@ -10,9 +11,11 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 NET=1
+DEEP=0
 for arg in "$@"; do
   case "$arg" in
     --no-net) NET=0 ;;
+    --deep) DEEP=1 ;;
     -h|--help) sed -n '2,8p' "$0"; exit 0 ;;
     *) echo "unknown flag $arg" >&2; exit 2 ;;
   esac
@@ -128,16 +131,30 @@ fi
 
 if [[ -n "${NEARAI_API_KEY:-}" ]]; then
   echo
-  echo "model gateway (spends one token)"
+  if [[ "$DEEP" -eq 1 ]]; then
+    echo "model gateway (one real completion, spends one token)"
+    body="{\"model\":\"${NEARAI_MODEL:-z-ai/glm-5.3-flash}\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}"
+  else
+    # An empty body fails validation *after* authentication, so this proves the
+    # key without spending a token. 400 means the key is good.
+    echo "model gateway (free: auth only, no tokens)"
+    body='{}'
+  fi
   code=$(curl -sS --max-time 30 -o /tmp/preflight-model.json -w '%{http_code}' \
     -X POST "${NEARAI_BASE_URL%/}/chat/completions" \
     -H "authorization: Bearer $NEARAI_API_KEY" \
     -H 'content-type: application/json' -H 'accept-encoding: identity' \
-    -d "{\"model\":\"${NEARAI_MODEL:-z-ai/glm-5.3-flash}\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}")
+    -d "$body")
   case "$code" in
-    200) ok "completion accepted (200)" ;;
-    401|403) bad "key rejected ($code)" "check NEARAI_API_KEY in .env" ;;
-    402|429) bad "credits unavailable ($code)" "NEAR has not issued credits yet — retry later; nothing else is blocked" ;;
+    200) ok "key accepted, inference works" ;;
+    400|422)
+      if [[ "$DEEP" -eq 1 ]]; then
+        bad "completion rejected ($code)" "$(head -c 200 /tmp/preflight-model.json)"
+      else
+        ok "key accepted (rejected the empty probe body, as expected)"
+      fi ;;
+    401|403) bad "key rejected ($code) — invalid or expired" "create a fresh key at cloud.near.ai and paste it again" ;;
+    402|429) bad "key valid but credits unavailable ($code)" "wait for the credits to land; retry later" ;;
     *) warn "unexpected $code from the model endpoint: $(head -c 200 /tmp/preflight-model.json)" ;;
   esac
   rm -f /tmp/preflight-model.json

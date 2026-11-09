@@ -95,7 +95,13 @@ export function recoverReceiptPublicKey(
   signatureHex: string,
 ): string {
   const digest = `0x${toHex(eip191Digest(text))}`;
-  const uncompressed = SigningKey.recoverPublicKey(digest, `0x${signatureHex}`);
+  // Live signatures arrive as "0x…"; the fixture omits the prefix. Accept both
+  // instead of producing the invalid "0x0x…" ethers rejects.
+  const body = signatureHex.replace(/^0x/i, "");
+  if (!/^[0-9a-fA-F]{130}$/.test(body)) {
+    throw new Error(`signature must be 65 bytes of hex, got ${body.length / 2}`);
+  }
+  const uncompressed = SigningKey.recoverPublicKey(digest, `0x${body}`);
   // Drop `0x04`, the SEC1 uncompressed-point marker the contract also omits.
   return uncompressed.slice(4).toLowerCase();
 }

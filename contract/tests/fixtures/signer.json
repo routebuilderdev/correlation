@@ -1,5 +1,5 @@
 {
-  "public_key": "e2c924704ca105e9f599a94dca3762d15445394d5a35bf40d4bf8c54858300eee34750269b556a3215f3287e180bc9cf6007691e153798ccf2c7a367a7f47639",
-  "address": "0xc94a34584e61545f894d0198b6be42940519617c",
-  "note": "synthetic fixture: locally generated key, same signing scheme as the model TEE; response is policy 1 / agent index 2"
+  "public_key": "42d42e51842e50841e08b096b62cdaf52786c7ce0b04577bb476cef327d42d8db9cc9dd35c9738bf7769e2b33d51c0a2d9aa01e85da0507ddb4e875a2b5bdfd1",
+  "address": "0x3b753b4406613c5e70ae640508632b600424fa0c",
+  "note": "captured 2026-11-09T20:39:31.593Z from 9643462024f3463ead59726fec0da651; policy 1 / agent index 2"
 }

@@ -92,7 +92,11 @@ pub struct SignatureRecord {
     /// 65 bytes, hex. `0x` prefix tolerated.
     pub signature: String,
     pub signing_algo: String,
-    pub signature_kind: String,
+    /// Direct model endpoints omit this: the serving enclave is the provider.
+    /// Only an explicit `gateway` is refused (the gateway signs without a model
+    /// prefix, so its text cannot pass the model check anyway).
+    #[serde(default)]
+    pub signature_kind: Option<String>,
     pub signing_address: Option<String>,
     pub signing_public_key: Option<String>,
     /// Present on some responses; the signed text is authoritative.

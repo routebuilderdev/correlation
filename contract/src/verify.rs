@@ -109,8 +109,11 @@ pub fn verify_receipt(
     let record: SignatureRecord =
         serde_json::from_str(signature_json).map_err(|_| ContractError::BadSignatureJson)?;
 
-    if record.signature_kind != "provider_tee" {
-        return Err(ContractError::GatewaySignature);
+    // Absent means a direct model signature; the gateway says "gateway" out loud.
+    if let Some(kind) = record.signature_kind.as_deref() {
+        if kind != "provider_tee" {
+            return Err(ContractError::GatewaySignature);
+        }
     }
     if record.signing_algo != "ecdsa" {
         return Err(ContractError::UnsupportedAlgo);
@@ -230,7 +233,7 @@ mod tests {
         setup();
         let signer = fixture_signer();
         let mut rec = record();
-        rec.signature_kind = "gateway".to_string();
+        rec.signature_kind = Some("gateway".to_string());
         let err = verify_receipt(
             "z-ai/glm-5.3-flash",
             &signer,

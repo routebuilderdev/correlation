@@ -49,7 +49,8 @@ if (!verified.ok) {
 if (verdict.n !== n) {
   throw new Error(`E13 TASK_MISMATCH: asked for n=${n}, model answered n=${verdict.n}`);
 }
-if (record.signature_kind !== "provider_tee") {
+// Direct endpoints omit signature_kind entirely; only an explicit gateway is fatal.
+if (record.signature_kind !== undefined && record.signature_kind !== "provider_tee") {
   throw new Error(
     `E07 NOT_PROVIDER_TEE: signature_kind=${record.signature_kind}. ` +
       "Point NEARAI_BASE_URL at a direct *.completions.near.ai endpoint, not the gateway.",
@@ -64,7 +65,7 @@ writeFileSync(
   join(FIXTURES, "signer.json"),
   `${JSON.stringify(
     {
-      public_key: record.signing_public_key,
+      public_key: verified.recovered,
       address: record.signing_address,
       note: `captured ${new Date().toISOString()} from ${completion.id}; policy ${POLICY_ID} / agent index ${AGENT_INDEX}`,
     },
@@ -74,5 +75,5 @@ writeFileSync(
 );
 
 process.stdout.write(
-  `verified ${record.signing_public_key.slice(0, 16)}… ✓\nwrote fixtures to ${FIXTURES}\n`,
+  `verified ${verified.recovered.slice(0, 16)}… ✓\nwrote fixtures to ${FIXTURES}\n`,
 );
