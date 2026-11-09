@@ -14,7 +14,7 @@ signed text from the raw request and response bytes, and recovers the signer key
 ```bash
 npm install                                   # shared, api, web
 cp .env.example .env                          # add NEARAI_API_KEY (never committed)
-npm test                                      # 24 TypeScript tests + 39 Rust tests
+npm test                                      # 29 TypeScript tests + 39 Rust tests
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
@@ -118,10 +118,14 @@ Deployment is not done yet: this machine has neither `near-cli` nor a funded tes
 |---|---|---|
 | `contract` (Rust) | 39 | signature path, policy terms, pool limits, receipts, index, claim, expiry, full 20-receipt run |
 | `shared` | 9 | cross-language vectors pinned to the Rust fixture |
-| `api` | 15 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim |
+| `api` | 20 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim, a full offline 20-agent run |
 
 `shared` and `api` deliberately assert the *same* error codes as the contract (`E07`, `E09`, `E10`,
 `E11`), so a divergence shows up as a failing test instead of a silent client-only pass.
+
+One trap worth naming: the provider signs the completion **content**, not the HTTP envelope. Hashing
+`{"id":…,"choices":…}` yields a receipt that looks fine locally and fails on chain as `E10`. The
+offline swarm test signs real messages with an ephemeral key, which is how that mistake was caught.
 
 ## Disclaimer
 

@@ -19,7 +19,8 @@ function stubFetch(body: string, status = 200): Seen[] {
   return seen;
 }
 
-const RESPONSE = '{"id":"cmpl_123","choices":[{"message":{"content":"{\\"n\\":1}"}}]}';
+const CONTENT = '{"n":10000022,"a":999707}';
+const RESPONSE = JSON.stringify({ id: "cmpl_123", choices: [{ message: { content: CONTENT } }] });
 
 test("sends the body string untouched and hashes those same bytes", async () => {
   const seen = stubFetch(RESPONSE);
@@ -31,7 +32,9 @@ test("sends the body string untouched and hashes those same bytes", async () => 
   assert.equal(seen[0]!.init.method, "POST");
   assert.equal(seen[0]!.init.body, body);
   assert.equal(new TextDecoder().decode(completion.requestBytes), body);
-  assert.equal(new TextDecoder().decode(completion.responseBytes), RESPONSE);
+  // The signature covers the content, not the envelope: this is the trap.
+  assert.equal(new TextDecoder().decode(completion.responseBytes), CONTENT);
+  assert.equal(new TextDecoder().decode(completion.rawBytes), RESPONSE);
   assert.equal(completion.id, "cmpl_123");
 });
 
@@ -46,6 +49,11 @@ test("sends the headers that make the signature checkable", async () => {
   assert.equal(headers.Authorization, "Bearer test-key");
 });
 
+test("an envelope with no message content is rejected", async () => {
+  stubFetch(JSON.stringify({ id: "cmpl_1", choices: [{}] }));
+  await assert.rejects(() => completeExact("m", "{}"), /no message content/);
+});
+
 test("a non-2xx response fails instead of being hashed as a receipt", async () => {
   stubFetch('{"error":"quota"}', 402);
   await assert.rejects(() => completeExact("m", "{}"), /nearai 402/);
@@ -53,5 +61,11 @@ test("a non-2xx response fails instead of being hashed as a receipt", async () =
 
 test("a response without an id fails", async () => {
   stubFetch("{}");
+  await assert.rejects(() => completeExact("m", "{}"), /no id/);
+});
+
+/** A bare verdict is its own content; providers do differ here. */
+test("a bare verdict body is hashed as-is", async () => {
+  stubFetch(CONTENT);
   await assert.rejects(() => completeExact("m", "{}"), /no id/);
 });

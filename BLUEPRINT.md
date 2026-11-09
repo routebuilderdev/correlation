@@ -1360,6 +1360,12 @@ With `strict: true` the model cannot wrap this in prose or fences, and `addition
 
 1. Request body is a string. Send that exact string.
 2. Response body is read as bytes. Never re-serialise.
+
+   **Sharp edge found while building:** the bytes that get signed are the completion **content**
+   (`choices[0].message.content`), not the HTTP envelope. The fixture proves it — `response.bin` is
+   `{"n":10000022,"a":999707}` and nothing else. Hashing the whole envelope produces a valid-
+   looking receipt that fails on chain as `E10` for every call. The envelope's `id` exists only to
+   fetch the signature; it is never part of the signed text.
 3. `Accept-Encoding: identity` on both.
 4. Hashes are lowercase hex, no `0x`.
 5. Signed text is `model + ":" + reqHex + ":" + respHex`.
