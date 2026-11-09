@@ -336,7 +336,9 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-near-sdk = { version = "5.30", features = ["legacy"] }
+# `unstable` is not optional: env::ecrecover is cfg-gated behind it in 5.30.
+# 5.30.1 also requires rustc >= 1.95, so the 1.86 pin in §9 is superseded.
+near-sdk = { version = "5.30", features = ["legacy", "unstable"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -659,6 +661,13 @@ Traps, in order of how often they bite:
 
 T3 is the gate. Everything else is ordinary. If T3 fails, stop and resolve before writing more.
 
+**Status 2026-11-09:** T3 passes in `cargo test` against a locally generated EIP-191 fixture
+(`contract/tests/fixtures/`), signed with the same secp256k1 scheme the model TEE uses. That
+settles `v` normalisation (27/28 → 0/1) and that `malleability_flag: false` recovers the key;
+no retry with `true` was needed. `near-sdk`'s unit-test mock implements `ecrecover`, so this
+runs without a sandbox. Re-point T3 at the live capture once `NEARAI_API_KEY` exists — the
+assertions do not change.
+
 ---
 
 ## 7. Off-chain services
@@ -844,7 +853,7 @@ NEAR_hackathon_2026/
 │
 ├── contract/
 │   ├── Cargo.toml
-│   ├── rust-toolchain.toml                 pin channel = "1.86"
+│   ├── rust-toolchain.toml                 pin channel = "1.99" (5.30 needs >= 1.95)
 │   ├── build.sh
 │   ├── src/
 │   │   ├── lib.rs

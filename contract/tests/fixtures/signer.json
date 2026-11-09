@@ -1,0 +1,5 @@
+{
+  "public_key": "8272671aa3d29e75085543f812537250d979716e36e60f4890ba8d53e4cc4b8f1941a1fdb767279167b5dad998d40950a44e1cc09741437f0d1caf6195728c6b",
+  "address": "4ccca02501fcd9d95ec6394f25e874a680d11c84",
+  "note": "synthetic fixture: locally generated key, same signing scheme as the model TEE"
+}
