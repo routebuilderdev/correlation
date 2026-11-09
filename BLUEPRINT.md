@@ -1001,6 +1001,17 @@ packages:
 
 `spike/` stays out of the workspace on purpose: it has its own lockfile and must remain runnable on its own.
 
+**Deviation, recorded at build time.** This machine has no `pnpm` and cannot fetch one, so the
+workspace uses **npm workspaces**: `npm install`, `npm test`, `npm run dev --workspace
+@correlation/api`. No `pnpm-workspace.yaml` is created, because a file nothing can run is worse than
+none. Two other build-time consolidations: `shared/src/eip191.ts` and `types.ts` folded into
+`canonical.ts` (one module, one set of constants, no import cycles), and `api/src/chain/` is a single
+module rather than `near.ts` + `submit.ts`.
+
+The contract checks model identity *before* comparing text (`E09` before `E10`), and the TypeScript
+mirror must keep that order: comparing text first turns a wrong-model receipt into `E10` and hides
+the real cause. A test pins it.
+
 ### 9.2 Dependency list
 
 | Package | Where | Why | Version |

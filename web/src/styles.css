@@ -1,0 +1,271 @@
+:root {
+  --bg: #0b0d10;
+  --panel: #121519;
+  --line: #22272e;
+  --text: #e6e9ef;
+  --muted: #8b93a1;
+  --accent: #6ee7b7;
+  --bad: #f3807b;
+  --warn: #f2c14e;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+}
+
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.badge {
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid #1f4d3d;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #0e1f19;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button {
+  background: #1a1f26;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: #3a4250;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #1b2027;
+  font-variant-numeric: tabular-nums;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row span {
+  color: var(--muted);
+}
+
+.row strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  font-size: 13px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.gauge-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.tag {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.tag.triggered {
+  color: var(--bad);
+  border-color: #5a2622;
+  background: #1e1211;
+}
+
+.bar {
+  position: relative;
+  height: 10px;
+  background: #171c22;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.fill {
+  height: 100%;
+  background: #2f4858;
+}
+
+.fill.crossed {
+  background: linear-gradient(90deg, #7f2c28, var(--bad));
+}
+
+.marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--warn);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #0f1317;
+}
+
+.cell.pending {
+  color: #4b5563;
+}
+
+.cell.pass {
+  color: var(--accent);
+  border-color: #1f4d3d;
+  background: #0e1f19;
+}
+
+.cell.fail,
+.cell.error {
+  color: var(--bad);
+  border-color: #5a2622;
+  background: #1e1211;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+}
+
+td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #171c22;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+tr.bad td {
+  color: var(--bad);
+}
+
+.alert {
+  border: 1px solid #5a2622;
+  background: #1e1211;
+  color: var(--bad);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+footer {
+  margin-top: 24px;
+  font-size: 11px;
+}
