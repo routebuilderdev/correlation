@@ -30,6 +30,7 @@ pub enum ContractError {
     BadTermsJson,
     SwarmNotFound,
     PoolNotFound,
+    NotExpired,
 }
 
 impl ContractError {
@@ -58,6 +59,7 @@ impl ContractError {
             Self::BadTermsJson => "E21",
             Self::SwarmNotFound => "E22",
             Self::PoolNotFound => "E23",
+            Self::NotExpired => "E24",
         }
     }
 
@@ -86,6 +88,7 @@ impl ContractError {
             Self::BadTermsJson => "BAD_TERMS_JSON",
             Self::SwarmNotFound => "SWARM_NOT_FOUND",
             Self::PoolNotFound => "POOL_NOT_FOUND",
+            Self::NotExpired => "NOT_EXPIRED",
         }
     }
 }

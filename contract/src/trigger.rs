@@ -1,5 +1,6 @@
 use near_sdk::{env, near, NearToken, Promise};
 
+use crate::receipt::RECEIPT_GRACE_NS;
 use crate::types::*;
 use crate::{Contract, ContractExt};
 
@@ -21,7 +22,10 @@ impl Contract {
             .get(&policy_id)
             .unwrap_or_else(|| env::panic_str("E01 POLICY_NOT_FOUND"));
 
-        if matches!(policy.status, PolicyStatus::Triggered | PolicyStatus::Paid) {
+        if matches!(
+            policy.status,
+            PolicyStatus::Triggered | PolicyStatus::Paid | PolicyStatus::Expired
+        ) {
             return;
         }
         assert_eq!(policy.status, PolicyStatus::Active, "E02 NOT_ACTIVE");
@@ -83,6 +87,36 @@ impl Contract {
         let _ = Promise::new(buyer).transfer(NearToken::from_yoctonear(payout));
         env::log_str(&format!(
             r#"{{"standard":"correlation","version":"1.0.0","event":"policy_paid","data":{{"policy_id":{policy_id},"amount":"{payout}"}}}}"#
+        ));
+    }
+
+    /// Anyone can retire a policy that never triggered. Releasing the commitment
+    /// is what lets LPs withdraw again; a Triggered policy is deliberately left
+    /// locked because the buyer is still owed that money.
+    pub fn expire(&mut self, policy_id: PolicyId) {
+        let mut policy = self
+            .policies
+            .get(&policy_id)
+            .unwrap_or_else(|| env::panic_str("E01 POLICY_NOT_FOUND"));
+        assert_eq!(policy.status, PolicyStatus::Active, "E02 NOT_ACTIVE");
+
+        let now = env::block_timestamp();
+        assert!(
+            now > policy.window_end_ns.saturating_add(RECEIPT_GRACE_NS),
+            "E24 NOT_EXPIRED: the window is still open"
+        );
+
+        policy.status = PolicyStatus::Expired;
+        self.policies.insert(&policy_id, &policy);
+
+        let mut pool = self.pool_by_id(1);
+        pool.committed = pool.committed.saturating_sub(policy.limit);
+        self.pools.insert(&1u64, &pool);
+        self.active_policies = self.active_policies.saturating_sub(1);
+
+        env::log_str(&format!(
+            r#"{{"standard":"correlation","version":"1.0.0","event":"policy_expired","data":{{"policy_id":{policy_id},"released":"{}"}}}}"#,
+            policy.limit
         ));
     }
 

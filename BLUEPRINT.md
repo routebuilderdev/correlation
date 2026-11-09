@@ -480,6 +480,7 @@ pub fn withdraw(&mut self, pool_id: PoolId, amount: u128);
     signature_json: String,
 );
 pub fn evaluate(&mut self, policy_id: PolicyId);
+pub fn expire(&mut self, policy_id: PolicyId);                     // anyone, after window + grace
 
 // --- views ---
 pub fn get_policy(&self, policy_id: PolicyId) -> PolicyView;
@@ -544,6 +545,11 @@ triggered = started >= policy.min_agents
 
 `evaluate` is idempotent; calling it twice changes nothing. It must be callable by anyone, because a stalled trigger is the failure mode that matters.
 
+`expire` is the counterpart: after `window_end_ns + RECEIPT_GRACE_NS`, anyone can retire a policy that
+never triggered. It releases `limit` from `pool.committed`, decrements `active_policies`, and emits
+`policy_expired`. It refuses a non-`Active` policy (`E02`) and refuses while the window is open
+(`E24`), so a buyer cannot escape a live window by expiring it early.
+
 `claim`:
 
 ```
@@ -599,6 +605,7 @@ Amounts are strings.
 | E21 | `BAD_TERMS_JSON` | unparseable or out-of-range terms |
 | E22 | `SWARM_NOT_FOUND` | `buy_policy` for an unregistered swarm |
 | E23 | `POOL_NOT_FOUND` | |
+| E24 | `NOT_EXPIRED` | `expire` called while the window (plus grace) is still open |
 
 E19–E23 were added during the build: §6.4's interface implies checks the original table
 had no codes for. §6.12's T2 asserts E19.
@@ -631,7 +638,10 @@ Must hold after every method. Assert in tests.
 3. A receipt exists at most once per `(policy_id, agent_id)`.
 4. `status == Paid ⇒ paid_amount > 0`.
 5. `status == Triggered ⇒ index_bps >= trigger_bps`.
-6. No withdrawal while any policy in the pool is `Active` or `Triggered`.
+6. No withdrawal while any policy is `Active` or `Triggered`. `expire` is the release valve: past
+   `window_end_ns + grace` an untriggered policy becomes `Expired`, its limit leaves `committed` and
+   it stops counting toward the lock. A `Triggered` policy does **not** expire — that money is owed
+   to the buyer, so its capital stays locked until `claim`.
 7. `terms_hash` never changes after purchase.
 8. `signer_pubkey` never changes after purchase.
 

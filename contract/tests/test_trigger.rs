@@ -8,11 +8,30 @@ use near_sdk::{testing_env, AccountId};
 const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 const MODEL: &str = "z-ai/glm-5.3-flash";
 
-fn ctx(who: &str) -> VMContextBuilder {
+const NOW: u64 = 1_700_000_100_000_000_000;
+const WINDOW_END: u64 = 1_700_003_600_000_000_000;
+const AFTER_EXPIRY: u64 = WINDOW_END + 10 * 60 * 1_000_000_000;
+
+fn ctx_at(who: &str, timestamp: u64) -> VMContextBuilder {
     let mut builder = VMContextBuilder::new();
     builder.predecessor_account_id(who.parse().unwrap());
-    builder.block_timestamp(1_700_000_100_000_000_000);
+    builder.block_timestamp(timestamp);
     builder
+}
+
+fn ctx(who: &str) -> VMContextBuilder {
+    ctx_at(who, NOW)
+}
+
+fn panic_message(result: std::thread::Result<()>) -> String {
+    match result {
+        Ok(()) => panic!("expected the call to fail"),
+        Err(payload) => payload
+            .downcast_ref::<String>()
+            .cloned()
+            .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+            .unwrap_or_default(),
+    }
 }
 
 fn buyer() -> AccountId {
@@ -29,7 +48,7 @@ fn policy(status: PolicyStatus) -> Policy {
         premium: ONE_NEAR,
         trigger_bps: 2500,
         window_start_ns: 1_700_000_000_000_000_000,
-        window_end_ns: 1_700_003_600_000_000_000,
+        window_end_ns: WINDOW_END,
         min_agents: 20,
         min_receipts: 16,
         model_id: MODEL.to_string(),
@@ -171,6 +190,60 @@ fn t12_payout_capped_by_pool() {
 
     assert_eq!(contract.get_policy(1).unwrap().paid_amount.0, 4 * ONE_NEAR);
     assert_eq!(contract.get_pool(1).unwrap().total.0, 0);
+}
+
+/// A policy that never triggered stops tying up pool capital once its window is
+/// over, which is what lets LPs withdraw again.
+#[test]
+fn expire_releases_commitment_and_unlocks_withdrawals() {
+    let mut contract = contract_with(policy(PolicyStatus::Active), 100 * ONE_NEAR);
+    assert_eq!(contract.get_pool(1).unwrap().committed.0, 10 * ONE_NEAR);
+
+    testing_env!(ctx_at("anyone.testnet", AFTER_EXPIRY).build());
+    contract.expire(1);
+
+    let view = contract.get_policy(1).unwrap();
+    assert_eq!(view.status, PolicyStatus::Expired);
+    let pool = contract.get_pool(1).unwrap();
+    assert_eq!(pool.committed.0, 0, "commitment released");
+    assert_eq!(pool.total.0, 100 * ONE_NEAR, "capital stays in the pool");
+    assert_eq!(pool.active_policies, 0);
+
+    testing_env!(ctx_at("lp.testnet", AFTER_EXPIRY).build());
+    contract.withdraw(1, 100 * ONE_NEAR);
+    assert_eq!(contract.get_pool(1).unwrap().total.0, 0);
+}
+
+#[test]
+fn expire_rejects_a_policy_whose_window_is_open() {
+    let mut contract = contract_with(policy(PolicyStatus::Active), 100 * ONE_NEAR);
+    testing_env!(ctx("anyone.testnet").build());
+    let message = panic_message(catch_unwind(AssertUnwindSafe(|| contract.expire(1))));
+    assert!(message.contains("E24"), "got {message}");
+    assert_eq!(contract.get_policy(1).unwrap().status, PolicyStatus::Active);
+}
+
+#[test]
+fn expire_is_not_repeatable() {
+    let mut contract = contract_with(policy(PolicyStatus::Active), 100 * ONE_NEAR);
+    testing_env!(ctx_at("anyone.testnet", AFTER_EXPIRY).build());
+    contract.expire(1);
+    let message = panic_message(catch_unwind(AssertUnwindSafe(|| contract.expire(1))));
+    assert!(message.contains("E02"), "got {message}");
+    assert_eq!(contract.get_pool(1).unwrap().committed.0, 0, "released once");
+}
+
+/// A triggered policy is money owed, so it stays locked and claimable.
+#[test]
+fn triggered_policy_cannot_expire() {
+    let mut contract = contract_with(policy(PolicyStatus::Triggered), 100 * ONE_NEAR);
+    testing_env!(ctx_at("anyone.testnet", AFTER_EXPIRY).build());
+    let message = panic_message(catch_unwind(AssertUnwindSafe(|| contract.expire(1))));
+    assert!(message.contains("E02"), "got {message}");
+
+    testing_env!(ctx_at("buyer.testnet", AFTER_EXPIRY).build());
+    contract.claim(1);
+    assert_eq!(contract.get_policy(1).unwrap().paid_amount.0, 10 * ONE_NEAR);
 }
 
 #[test]

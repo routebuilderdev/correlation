@@ -210,6 +210,26 @@ fn t5_gateway_signature_rejected() {
 }
 
 #[test]
+fn expired_policies_accept_no_more_receipts() {
+    let mut contract = policy_with_receipt_window();
+    let mut context = ctx("anyone.testnet");
+    context.block_timestamp(WINDOW_END + 10 * 60 * 1_000_000_000);
+    testing_env!(context.build());
+    contract.expire(1);
+
+    let message = panic_message(catch_unwind(AssertUnwindSafe(|| {
+        contract.post_receipt(
+            1,
+            "agent-03".to_string(),
+            REQUEST.to_vec(),
+            RESPONSE.to_vec(),
+            SIGNATURE.to_string(),
+        )
+    })));
+    assert!(message.contains("E02"), "got {message}");
+}
+
+#[test]
 fn rejects_receipts_outside_the_window() {
     let mut contract = policy_with_receipt_window();
     let mut context = ctx("eval.testnet");
