@@ -89,6 +89,16 @@ test("grace period matches the contract constant", () => {
   assert.equal(RECEIPT_GRACE_NS, 300_000_000_000n);
 });
 
+test("the verdict is found inside an OpenAI envelope", () => {
+  const body = new TextEncoder().encode(
+    JSON.stringify({
+      id: "cmpl_1",
+      choices: [{ message: { role: "assistant", content: '{"n":10000022,"a":999707}' } }],
+    }),
+  );
+  assert.deepEqual(parseVerdict(body), { n: 10_000_022, a: 999_707 });
+});
+
 test("a non-verdict body is rejected rather than coerced", () => {
   assert.throws(() => parseVerdict(new TextEncoder().encode('{"n":"1000","a":1}')));
   assert.throws(() => parseVerdict(new TextEncoder().encode("not json")));

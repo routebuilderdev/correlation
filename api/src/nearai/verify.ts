@@ -32,6 +32,13 @@ export interface VerifiedReceipt {
   text: string;
 }
 
+/** A missing signature is "unavailable", not a failed verification (§ direct docs). */
+export class SignatureUnavailable extends Error {
+  constructor(readonly completionId: string) {
+    super(`signature unavailable for completion ${completionId}`);
+  }
+}
+
 export class ReceiptError extends Error {
   constructor(
     readonly code: string,
@@ -53,7 +60,11 @@ export async function fetchSignature(
   if (cached) return cached;
 
   const url = new URL(`${config.nearaiBaseUrl}/signature/${encodeURIComponent(id)}`);
-  url.searchParams.set("model", model);
+  // Direct model endpoints (`{slug}.completions.near.ai`) take only the algo;
+  // the gateway needs the model id to find the right model TEE.
+  if (!config.nearaiBaseUrl.includes(".completions.near.ai")) {
+    url.searchParams.set("model", model);
+  }
   url.searchParams.set("signing_algo", algo);
 
   const response = await fetch(url, {
@@ -63,6 +74,9 @@ export async function fetchSignature(
       "x-no-aliasing": "true",
     },
   });
+  if (response.status === 404) {
+    throw new SignatureUnavailable(id);
+  }
   if (!response.ok) {
     throw new Error(`signature ${response.status} for completion ${id}`);
   }

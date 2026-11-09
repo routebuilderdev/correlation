@@ -14,7 +14,7 @@ signed text from the raw request and response bytes, and recovers the signer key
 ```bash
 npm install                                   # shared, api, web
 cp .env.example .env                          # add NEARAI_API_KEY (never committed)
-npm test                                      # 29 TypeScript tests (shared + api)
+npm test                                      # 28 TypeScript tests (shared + api)
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
@@ -116,16 +116,22 @@ Deployment is not done yet: this machine has neither `near-cli` nor a funded tes
 
 | Suite | Count | Covers |
 |---|---|---|
-| `contract` (Rust) | 39 | signature path, policy terms, pool limits, receipts, index, claim, expiry, full 20-receipt run |
-| `shared` | 9 | cross-language vectors pinned to the Rust fixture |
+| `contract` (Rust) | 42 | signature path, policy terms, pool limits, receipts (bare + envelope verdicts), index, claim, expiry, full 20-receipt run |
+| `shared` | 10 | cross-language vectors pinned to the Rust fixture |
 | `api` | 20 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim, a full offline 20-agent run |
 
 `shared` and `api` deliberately assert the *same* error codes as the contract (`E07`, `E09`, `E10`,
 `E11`), so a divergence shows up as a failing test instead of a silent client-only pass.
 
-One trap worth naming: the provider signs the completion **content**, not the HTTP envelope. Hashing
-`{"id":…,"choices":…}` yields a receipt that looks fine locally and fails on chain as `E10`. The
-offline swarm test signs real messages with an ephemeral key, which is how that mistake was caught.
+One trap worth naming: the provider signs the **raw response body**, envelope included
+(`response_hash = SHA-256(exact response-body bytes)`, per the NEAR AI docs). The contract therefore
+unwraps `choices[0].message.content` itself to read the verdict, rather than asking the orchestrator
+to submit extracted bytes — that would make the hash disagree with the signature.
+
+A second trap: signed text differs by endpoint. Direct model endpoints (`*.completions.near.ai`)
+sign `<model>:<req>:<resp>` and produce `provider_tee` signatures; the `cloud-api.near.ai` gateway
+signs `<req>:<resp>` with no model prefix. Set `NEARAI_BASE_URL` to a direct endpoint, or every
+receipt is rejected as `E07`.
 
 ## Disclaimer
 

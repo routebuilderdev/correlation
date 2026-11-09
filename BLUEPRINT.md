@@ -1361,11 +1361,28 @@ With `strict: true` the model cannot wrap this in prose or fences, and `addition
 1. Request body is a string. Send that exact string.
 2. Response body is read as bytes. Never re-serialise.
 
-   **Sharp edge found while building:** the bytes that get signed are the completion **content**
-   (`choices[0].message.content`), not the HTTP envelope. The fixture proves it — `response.bin` is
-   `{"n":10000022,"a":999707}` and nothing else. Hashing the whole envelope produces a valid-
-   looking receipt that fails on chain as `E10` for every call. The envelope's `id` exists only to
-   fetch the signature; it is never part of the signed text.
+   **Verified against the live docs (2026-11-09), and it contradicts the synthetic fixture:**
+   `response_hash = SHA-256(exact response-body bytes)`, and the docs say explicitly not to parse
+   and re-serialise JSON. So the signed bytes are the **whole response body, envelope included**;
+   `response.bin` in `fixtures/` is therefore shaped like a *content* string, not like a real body.
+   Two consequences, both now implemented:
+
+   - `api` hashes the raw body and never extracts content before hashing.
+   - `post_receipt` must unwrap `choices[0].message.content` itself to read the verdict, because
+     asking the orchestrator to submit extracted bytes would make the hash disagree with the
+     signature. `parse_verdict` accepts a bare `{n,a}` and an OpenAI envelope.
+
+   **The endpoint choice is now load-bearing.** Signed text differs by endpoint:
+
+   | Endpoint | `text` | `signature_kind` | Verdict here |
+   |---|---|---|---|
+   | `{slug}.completions.near.ai` (direct model TEE) | `<model_name>:<req>:<resp>` | `provider_tee` | **required** |
+   | `cloud-api.near.ai` (gateway) | `<req>:<resp>` — no model prefix | `gateway` | rejected `E07` |
+
+   So `NEARAI_BASE_URL` must point at a direct model endpoint. The gateway's text format also
+   cannot pass `E09`'s model check, which is the same conclusion from the other side.
+   A signature lookup may return `404`; that is "unavailable", not a failure — surface it as such
+   rather than counting the agent as wrong.
 3. `Accept-Encoding: identity` on both.
 4. Hashes are lowercase hex, no `0x`.
 5. Signed text is `model + ":" + reqHex + ":" + respHex`.

@@ -46,10 +46,13 @@ function installFakeProvider(wallet: EphemeralSigner, poisoned: boolean): void {
       let answer = correct;
       if (poisoned && WRONG.has(index)) answer = correct + 1;
       // An agent that is merely confused still returns schema-valid JSON.
-      const responseBytes = new TextEncoder().encode(JSON.stringify({ n, a: answer }));
+      const content = JSON.stringify({ n, a: answer });
+      const id = `cmpl-${tag}-${counter++}`;
+      // The signature covers the raw response body, envelope included.
+      const envelope = JSON.stringify({ id, choices: [{ message: { content } }] });
+      const responseBytes = new TextEncoder().encode(envelope);
 
       const text = signedText(MODEL, new TextEncoder().encode(body), responseBytes);
-      const id = `cmpl-${tag}-${counter++}`;
       records.set(id, {
         text,
         signature: (await wallet.signMessage(text)).slice(2),
@@ -59,10 +62,7 @@ function installFakeProvider(wallet: EphemeralSigner, poisoned: boolean): void {
         signature_kind: "provider_tee",
       });
 
-      return new Response(
-        JSON.stringify({ id, choices: [{ message: { content: new TextDecoder().decode(responseBytes) } }] }),
-        { status: 200 },
-      );
+      return new Response(envelope, { status: 200 });
     }
 
     if (url.includes("/signature/")) {
@@ -131,9 +131,13 @@ test("an unverifiable receipt is an error, not a wrong answer", async () => {
     if (url.endsWith("/chat/completions")) {
       const body = String(init?.body ?? "");
       const n = Number(/n = (\d+)/.exec(body)![1]);
-      const responseBytes = new TextEncoder().encode(JSON.stringify({ n, a: 0 }));
-      const text = signedText(MODEL, new TextEncoder().encode(body), responseBytes);
       const id = `cmpl-${records.size}`;
+      const envelope = JSON.stringify({
+        id,
+        choices: [{ message: { content: JSON.stringify({ n, a: 0 }) } }],
+      });
+      const responseBytes = new TextEncoder().encode(envelope);
+      const text = signedText(MODEL, new TextEncoder().encode(body), responseBytes);
       // Signed by a *different* key than the one it claims.
       records.set(id, {
         text,
@@ -143,10 +147,7 @@ test("an unverifiable receipt is an error, not a wrong answer", async () => {
         signing_algo: "ecdsa",
         signature_kind: "provider_tee",
       });
-      return new Response(
-        JSON.stringify({ id, choices: [{ message: { content: new TextDecoder().decode(responseBytes) } }] }),
-        { status: 200 },
-      );
+      return new Response(envelope, { status: 200 });
     }
     const id = decodeURIComponent(url.split("/signature/")[1]!.split("?")[0]!);
     const record = records.get(id) as Record<string, unknown>;

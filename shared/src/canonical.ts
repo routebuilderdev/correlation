@@ -113,16 +113,34 @@ export interface Verdict {
   a: number;
 }
 
-/** `JSON.parse` for display only — never hash the result of a re-stringify. */
+/**
+ * Read the verdict out of the response body. Parsing is for reading only — the
+ * bytes that were hashed are the raw ones, never a re-stringified object.
+ *
+ * Accepts both shapes deliberately: a bare `{"n":…,"a":…}` and an OpenAI
+ * chat-completions envelope whose `choices[0].message.content` holds it. The
+ * provider signs the raw HTTP body, which is the envelope, so the content
+ * string is unwrapped here rather than by changing the bytes.
+ */
 export function parseVerdict(responseBytes: Uint8Array): Verdict {
   const value: unknown = JSON.parse(new TextDecoder().decode(responseBytes));
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    !Number.isInteger((value as Verdict).n) ||
-    !Number.isInteger((value as Verdict).a)
-  ) {
-    throw new Error("E21 BAD_VERDICT_JSON: expected {n: integer, a: integer}");
+  if (isVerdict(value)) return value;
+
+  const content = (value as { choices?: Array<{ message?: { content?: unknown } }> })
+    .choices?.[0]?.message?.content;
+  if (typeof content === "string") {
+    const inner: unknown = JSON.parse(content);
+    if (isVerdict(inner)) return inner;
   }
-  return value as Verdict;
+
+  throw new Error("E21 BAD_VERDICT_JSON: expected {n, a}, bare or in message content");
+}
+
+function isVerdict(value: unknown): value is Verdict {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Number.isInteger((value as Verdict).n) &&
+    Number.isInteger((value as Verdict).a)
+  );
 }

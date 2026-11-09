@@ -38,6 +38,29 @@ struct Verdict {
     a: u64,
 }
 
+/// Accept the verdict either bare or wrapped in an OpenAI chat-completions
+/// envelope.
+///
+/// The signature covers the **raw response body** (NEAR AI docs: "response_hash
+/// = SHA-256(exact response-body bytes)... Do not parse and re-serialize JSON").
+/// A cloud completion body is `{id, choices:[{message:{content:"{...}"}}]}`, so
+/// the contract has to unwrap the content string before checking the arithmetic —
+/// and must not ask the orchestrator to do it, because then the bytes it hashes
+/// would no longer be the bytes that were signed.
+fn parse_verdict(bytes: &[u8]) -> Option<Verdict> {
+    if let Ok(verdict) = serde_json::from_slice::<Verdict>(bytes) {
+        return Some(verdict);
+    }
+    let envelope: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+    let content = envelope
+        .get("choices")?
+        .get(0)?
+        .get("message")?
+        .get("content")?
+        .as_str()?;
+    serde_json::from_str::<Verdict>(content).ok()
+}
+
 #[near]
 impl Contract {
     #[payable]
@@ -93,8 +116,8 @@ impl Contract {
         )
         .unwrap_or_else(|err| env::panic_str(&err.to_string()));
 
-        let verdict: Verdict = serde_json::from_slice(&response_bytes)
-            .unwrap_or_else(|_| env::panic_str("E12 UNPARSEABLE"));
+        let verdict = parse_verdict(&response_bytes)
+            .unwrap_or_else(|| env::panic_str("E12 UNPARSEABLE"));
 
         let expected_n = expected_task_input(policy_id, index);
         assert_eq!(
@@ -143,5 +166,31 @@ impl Contract {
                 signer: to_hex(&receipt.signer),
                 posted_at_ns: receipt.posted_at_ns,
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_verdict;
+
+    #[test]
+    fn parses_a_bare_verdict() {
+        let verdict = parse_verdict(br#"{"n":10000022,"a":999707}"#).unwrap();
+        assert_eq!((verdict.n, verdict.a), (10_000_022, 999_707));
+    }
+
+    /// A real completion body is an envelope; its content string is the verdict.
+    #[test]
+    fn parses_an_openai_envelope() {
+        let body = br#"{"id":"abc","choices":[{"message":{"role":"assistant","content":"{\"n\":10000022,\"a\":999707}"}}]}"#;
+        let verdict = parse_verdict(body).unwrap();
+        assert_eq!((verdict.n, verdict.a), (10_000_022, 999_707));
+    }
+
+    #[test]
+    fn rejects_prose_and_empty_content() {
+        assert!(parse_verdict(b"the answer is 42").is_none());
+        assert!(parse_verdict(br#"{"choices":[{"message":{"content":"nope"}}]}"#).is_none());
+        assert!(parse_verdict(br#"{"choices":[]}"#).is_none());
     }
 }
