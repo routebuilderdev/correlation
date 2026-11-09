@@ -31,11 +31,14 @@ const signature = JSON.parse(
 ) as {
   text: string;
   signature: string;
-  signing_public_key: string;
   signing_address: string;
   signing_algo: string;
-  signature_kind: string;
 };
+// A live record has no signing_public_key or signature_kind, so the pinned key
+// comes from signer.json — the same value the contract holds.
+const pinnedKey = (
+  JSON.parse(readFileSync(join(FIXTURES, "signer.json"), "utf8")) as { public_key: string }
+).public_key;
 
 test("sha256 matches the hash the provider signed", () => {
   const [model, requestHash, responseHash] = signature.text.split(":");
@@ -50,7 +53,7 @@ test("signedText rebuilds the exact signed string", () => {
 
 test("the signature recovers the pinned public key", () => {
   const recovered = recoverReceiptPublicKey(signature.text, signature.signature);
-  assert.equal(recovered, signature.signing_public_key);
+  assert.equal(recovered, pinnedKey);
 });
 
 test("one flipped byte changes the recovered signer", () => {
@@ -60,7 +63,7 @@ test("one flipped byte changes the recovered signer", () => {
     signedText(MODEL, requestBytes, tampered),
     signature.signature,
   );
-  assert.notEqual(recovered, signature.signing_public_key);
+  assert.notEqual(recovered, pinnedKey);
 });
 
 test("the verdict satisfies the arithmetic the contract recomputes", () => {

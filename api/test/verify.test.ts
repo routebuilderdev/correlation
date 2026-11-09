@@ -12,6 +12,11 @@ const responseBytes = new Uint8Array(readFileSync(join(FIXTURES, "response.bin")
 const record = JSON.parse(
   readFileSync(join(FIXTURES, "signature.json"), "utf8"),
 ) as SignatureRecord;
+// The live signature record has no signing_public_key; signer.json is the key
+// the contract pins, so that is what the recovered key must match.
+const pinnedKey = (
+  JSON.parse(readFileSync(join(FIXTURES, "signer.json"), "utf8")) as { public_key: string }
+).public_key;
 
 function codeOf(run: () => Promise<unknown>): Promise<string> {
   return run().then(
@@ -26,11 +31,11 @@ test("accepts the fixture the contract also accepts", async () => {
     requestBytes,
     responseBytes,
     MODEL,
-    record.signing_public_key,
+    pinnedKey,
   );
   assert.equal(verified.ok, true);
   assert.equal(verified.verdict.n, 10_000_022);
-  assert.equal(verified.recovered, record.signing_public_key);
+  assert.equal(verified.recovered, pinnedKey);
 });
 
 test("one flipped byte is E10, exactly like the chain", async () => {
