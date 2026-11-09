@@ -14,7 +14,7 @@ signed text from the raw request and response bytes, and recovers the signer key
 ```bash
 npm install                                   # shared, api, web
 cp .env.example .env                          # add NEARAI_API_KEY (never committed)
-npm test                                      # 29 TypeScript tests + 39 Rust tests
+npm test                                      # 29 TypeScript tests (shared + api)
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
