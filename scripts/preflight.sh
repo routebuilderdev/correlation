@@ -110,8 +110,8 @@ PY
 }
 
 check_account "${CONTRACT_ID:-correlation.testnet}" 0 "run ./scripts/deploy.sh to create and deploy it"
-check_account "${EVAL_ACCOUNT:-eval.correlation.testnet}" 1000000000000000000000000 "run ./scripts/register-signer.sh"
-check_account "${BUYER_ACCOUNT:-buyer.correlation.testnet}" 10000000000000000000000000 "fund it from the testnet faucet"
+check_account "${EVAL_ACCOUNT:-correlation-eval.testnet}" 1000000000000000000000000 "run ./scripts/register-signer.sh"
+check_account "${BUYER_ACCOUNT:-correlation-buyer.testnet}" 10000000000000000000000000 "fund it from the testnet faucet"
 
 # Is the contract actually deployed, and does it answer?
 if [[ -n "${CONTRACT_ID:-}" ]]; then

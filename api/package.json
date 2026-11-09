@@ -7,6 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "capture": "tsx scripts/capture-fixture.ts",
+    "testnet": "tsx scripts/testnet-setup.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
