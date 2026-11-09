@@ -130,8 +130,9 @@ to submit extracted bytes — that would make the hash disagree with the signatu
 
 A second trap: signed text differs by endpoint. Direct model endpoints (`*.completions.near.ai`)
 sign `<model>:<req>:<resp>` and produce `provider_tee` signatures; the `cloud-api.near.ai` gateway
-signs `<req>:<resp>` with no model prefix. Set `NEARAI_BASE_URL` to a direct endpoint, or every
-receipt is rejected as `E07`.
+signs `<req>:<resp>` with no model prefix. `NEARAI_BASE_URL` therefore defaults to
+`https://glm-5-3-flash.completions.near.ai/v1` (from the public list at
+`completions.near.ai/endpoints`); pointing it at the gateway rejects every receipt as `E07`.
 
 ## Disclaimer
 

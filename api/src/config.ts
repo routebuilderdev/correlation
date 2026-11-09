@@ -1,7 +1,12 @@
 /** Everything configurable lives here; nothing else reads `process.env`. */
 export const config = {
   port: Number(process.env.PORT ?? 8787),
-  nearaiBaseUrl: (process.env.NEARAI_BASE_URL ?? "https://cloud-api.near.ai/v1").replace(/\/$/, ""),
+  // Direct model endpoint, not the cloud-api gateway: only direct endpoints sign
+  // "<model>:<req>:<resp>" as provider_tee, which is what the contract accepts.
+  // Discovered from the public list at https://completions.near.ai/endpoints.
+  nearaiBaseUrl: (
+    process.env.NEARAI_BASE_URL ?? "https://glm-5-3-flash.completions.near.ai/v1"
+  ).replace(/\/$/, ""),
   nearaiApiKey: process.env.NEARAI_API_KEY ?? "",
   model: process.env.NEARAI_MODEL ?? "z-ai/glm-5.3-flash",
   networkId: process.env.NEAR_NETWORK ?? "testnet",
