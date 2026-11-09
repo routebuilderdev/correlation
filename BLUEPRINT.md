@@ -521,6 +521,18 @@ Order matters. Fail at the cheapest check first.
 23. emit ReceiptPosted { policy_id, agent_id, ok, request_hash, response_hash }
 ```
 
+**Two gaps closed during the build.** §6.5 refers to `expected_n_for(agent_id)` and a grace
+period without defining either; both are now fixed in `receipt.rs`:
+
+- The expected input is *derived*, never submitted:
+  `n = 10_000_000 + ((policy_id % 1000) * 20 + agent_index) % 20_000`, where `agent_index` is the
+  agent's position in `swarm.agent_ids`. Orchestrator and contract compute the same number, so
+  there is no agent→n mapping to trust. It is unique within a policy for `N <= 20_000`.
+- The grace period is a constant, `RECEIPT_GRACE_NS = 5 min`, added to `window_end_ns`; it is not
+  part of the signed terms.
+- The replay guard is the nullifier `policy_id ‖ agent_id ‖ window_start_ns` in a
+  `LookupSet<Vec<u8>>`, checked before any signature work, so a replay costs one storage read.
+
 ### 6.6 Index and trigger
 
 ```
@@ -582,6 +594,19 @@ Amounts are strings.
 | E16 | `WITHDRAW_LOCKED` | |
 | E17 | `UNAUTHORIZED` | |
 | E18 | `PAUSED` | |
+| E19 | `PREMIUM_MISMATCH` | attached deposit ≠ premium |
+| E20 | `TERMS_HASH_MISMATCH` | `sha256(terms_json)` ≠ submitted hash |
+| E21 | `BAD_TERMS_JSON` | unparseable or out-of-range terms |
+| E22 | `SWARM_NOT_FOUND` | `buy_policy` for an unregistered swarm |
+| E23 | `POOL_NOT_FOUND` | |
+
+E19–E23 were added during the build: §6.4's interface implies checks the original table
+had no codes for. §6.12's T2 asserts E19.
+
+**Pool association.** `Policy` has no `pool_id` (§6.3), so the MVP treats the pool as
+implicit: `new` creates pool `1`, `deposit`/`withdraw` target it, and `buy_policy` commits
+coverage against it. Premiums are credited to `total`, limits to `committed`, and
+`committed + limit <= total` is enforced before a policy exists (§6.10 #1).
 
 `TEXT_MISMATCH` should return the expected text so the client can diff it. That single debugging affordance saves hours.
 
@@ -727,7 +752,9 @@ export async function verifyAttestation(model: string): Promise<{ pubkey: string
 ```ts
 // task.ts
 export const AGENT_COUNT = 20;
-export function taskInput(runSeed: number, index: number): number;   // unique 8-digit n
+// Must match the contract: n = 10_000_000 + ((policyId % 1000) * 20 + index) % 20_000.
+// The contract derives the same value, so a mismatch surfaces as E13, not as trust.
+export function taskInput(policyId: number, index: number): number;
 export function expected(taskInput: number): number;
 
 // agents.ts

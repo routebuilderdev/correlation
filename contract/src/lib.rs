@@ -1,11 +1,19 @@
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::{LookupMap, LookupSet};
 use near_sdk::{env, near, AccountId, PanicOnDefault};
 
 pub mod errors;
+pub mod nft;
+pub mod policy;
+pub mod pool;
+pub mod receipt;
+pub mod trigger;
 pub mod types;
 pub mod verify;
 
-use types::{PolicyId, RegisterSignerArgs, SignerRegistration, SignerView};
+use types::{
+    AgentId, Policy, PolicyId, Pool, PoolId, Receipt, RegisterSignerArgs, SignerRegistration, SignerView,
+    SwarmFingerprint, SwarmId, TokenId,
+};
 use verify::{from_hex, to_hex};
 
 /// State per blueprint §6.3. Only the parts needed by the verification gate exist
@@ -16,9 +24,21 @@ pub struct Contract {
     pub owner: AccountId,
     pub paused: bool,
     pub next_policy_id: PolicyId,
-    pub next_pool_id: u64,
+    pub next_pool_id: PoolId,
     /// 64-byte secp256k1 keys, registered only after off-chain attestation (D11).
     pub signers: LookupMap<[u8; 64], SignerRegistration>,
+    pub policies: LookupMap<PolicyId, Policy>,
+    pub pools: LookupMap<PoolId, Pool>,
+    pub swarms: LookupMap<SwarmId, SwarmFingerprint>,
+    pub tokens: LookupMap<TokenId, PolicyId>,
+    pub token_owner: LookupMap<TokenId, AccountId>,
+    pub token_frozen: LookupMap<TokenId, bool>,
+    /// At most one receipt per agent per policy (§6.10 #3).
+    pub receipts: LookupMap<(PolicyId, AgentId), Receipt>,
+    /// Replay guard: policy | agent | window start (§4.3).
+    pub nullifiers: LookupSet<Vec<u8>>,
+    /// Capital is locked while this is non-zero (§6.10 #6).
+    pub active_policies: u32,
 }
 
 fn fixed_hex<const N: usize>(label: &str, value: &str) -> [u8; N] {
@@ -39,12 +59,32 @@ fn fixed_hex<const N: usize>(label: &str, value: &str) -> [u8; N] {
 impl Contract {
     #[init]
     pub fn new(owner: AccountId) -> Self {
+        let mut pools = LookupMap::new(b"pools".to_vec());
+        // The MVP runs a single pool; the id is reserved here so `deposit` works
+        // before any policy exists.
+        pools.insert(
+            &1u64,
+            &Pool {
+                pool_id: 1,
+                total: 0,
+                committed: 0,
+            },
+        );
         Self {
             owner,
             paused: false,
             next_policy_id: 1,
-            next_pool_id: 1,
+            next_pool_id: 2,
             signers: LookupMap::new(b"signers".to_vec()),
+            policies: LookupMap::new(b"policies".to_vec()),
+            pools,
+            swarms: LookupMap::new(b"swarms".to_vec()),
+            tokens: LookupMap::new(b"tokens".to_vec()),
+            token_owner: LookupMap::new(b"token_owner".to_vec()),
+            token_frozen: LookupMap::new(b"token_frozen".to_vec()),
+            receipts: LookupMap::new(b"receipts".to_vec()),
+            nullifiers: LookupSet::new(b"nullifiers".to_vec()),
+            active_policies: 0,
         }
     }
 
@@ -104,7 +144,13 @@ mod tests {
     use near_sdk::test_utils::VMContextBuilder;
     use near_sdk::testing_env;
 
-    const PUBLIC_KEY: &str = "8272671aa3d29e75085543f812537250d979716e36e60f4890ba8d53e4cc4b8f1941a1fdb767279167b5dad998d40950a44e1cc09741437f0d1caf6195728c6b";
+    /// The key is read from the fixture so regenerating the fixture cannot leave
+    /// a stale constant behind.
+    fn public_key() -> String {
+        let signer: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/signer.json")).unwrap();
+        signer["public_key"].as_str().unwrap().to_string()
+    }
 
     fn context(predecessor: &str) -> VMContextBuilder {
         let mut builder = VMContextBuilder::new();
@@ -114,7 +160,7 @@ mod tests {
 
     fn args() -> RegisterSignerArgs {
         RegisterSignerArgs {
-            public_key: PUBLIC_KEY.to_string(),
+            public_key: public_key(),
             model_name: "z-ai/glm-5.3-flash".to_string(),
             compose_hash: "e8416a02".to_string() + &"0".repeat(56),
             os_image_hash: "11".repeat(32),
@@ -150,9 +196,9 @@ mod tests {
 
         testing_env!(context("owner.testnet").build());
         contract.register_signer(args());
-        let signer = contract.get_signer(PUBLIC_KEY.to_string()).unwrap();
+        let signer = contract.get_signer(public_key()).unwrap();
         assert_eq!(signer.model_name, "z-ai/glm-5.3-flash");
-        assert_eq!(signer.public_key, PUBLIC_KEY);
+        assert_eq!(signer.public_key, public_key());
         assert_eq!(signer.compose_hash, args().compose_hash);
     }
 

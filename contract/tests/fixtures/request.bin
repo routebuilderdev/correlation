@@ -1,1 +1,1 @@
-{"model":"z-ai/glm-5.3-flash","messages":[{"role":"system","content":"You are a careful arithmetic agent. Return only JSON."},{"role":"user","content":"n=48271933. Return {\"n\":n,\"a\":(n*37) mod 1000003}."}],"temperature":0,"max_tokens":64}
+{"model":"z-ai/glm-5.3-flash","messages":[{"role":"system","content":"You are a careful arithmetic agent. Return only JSON."},{"role":"user","content":"n=10000022. Return {\"n\":n,\"a\":(n*37) mod 1000003}."}],"temperature":0,"max_tokens":64}

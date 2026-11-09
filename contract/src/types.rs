@@ -1,3 +1,4 @@
+use near_sdk::json_types::U128;
 use near_sdk::near;
 
 pub type PolicyId = u64;
@@ -124,4 +125,97 @@ pub struct SignerView {
     pub policy_hash: String,
     pub verified_at_ns: u64,
     pub expires_at_ns: u64,
+}
+
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug)]
+pub struct Pool {
+    pub pool_id: PoolId,
+    /// Deposits plus collected premiums, in yoctoNEAR.
+    pub total: u128,
+    /// Sum of limits of live policies; never exceeds `total` (§6.10 #1).
+    pub committed: u128,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct PoolView {
+    pub pool_id: PoolId,
+    pub total: U128,
+    pub committed: U128,
+    pub available: U128,
+    pub active_policies: u32,
+}
+
+/// What the buyer signs. `terms_json` is submitted verbatim and hashed by the
+/// contract, so the terms cannot change under the policy (§6.10 #7).
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct PolicyTerms {
+    pub terms_json: String,
+    /// sha256 of `terms_json`, lowercase hex.
+    pub terms_hash: String,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct NftMetadata {
+    pub title: String,
+    pub description: String,
+    pub copies: u32,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct NftToken {
+    pub token_id: TokenId,
+    pub owner_id: near_sdk::AccountId,
+    pub policy_id: PolicyId,
+    pub frozen: bool,
+    pub metadata: NftMetadata,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct ReceiptView {
+    pub ok: bool,
+    pub failure_class: u16,
+    pub request_hash: String,
+    pub response_hash: String,
+    pub signer: String,
+    pub posted_at_ns: u64,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct IndexView {
+    pub policy_id: PolicyId,
+    pub failed: u32,
+    pub started: u32,
+    pub index_bps: u16,
+    pub triggered: bool,
+}
+
+/// JSON view of a policy. Amounts are strings, keys are hex (§8.5).
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct PolicyView {
+    pub policy_id: PolicyId,
+    pub swarm_id: SwarmId,
+    pub buyer: near_sdk::AccountId,
+    pub token_id: TokenId,
+    pub status: PolicyStatus,
+    pub limit: U128,
+    pub premium: U128,
+    pub paid_amount: U128,
+    pub trigger_bps: u16,
+    pub window_start_ns: u64,
+    pub window_end_ns: u64,
+    pub min_agents: u32,
+    pub min_receipts: u32,
+    pub model_id: String,
+    pub signer_pubkey: String,
+    pub terms_hash: String,
+    pub failed: u32,
+    pub started: u32,
 }

@@ -23,6 +23,13 @@ pub enum ContractError {
     WithdrawLocked,
     Unauthorized,
     Paused,
+    // Codes below are not in the §6.8 table; the purchase path needs them and the
+    // blueprint records them alongside the original eighteen.
+    PremiumMismatch,
+    TermsHashMismatch,
+    BadTermsJson,
+    SwarmNotFound,
+    PoolNotFound,
 }
 
 impl ContractError {
@@ -46,6 +53,11 @@ impl ContractError {
             Self::WithdrawLocked => "E16",
             Self::Unauthorized => "E17",
             Self::Paused => "E18",
+            Self::PremiumMismatch => "E19",
+            Self::TermsHashMismatch => "E20",
+            Self::BadTermsJson => "E21",
+            Self::SwarmNotFound => "E22",
+            Self::PoolNotFound => "E23",
         }
     }
 
@@ -69,6 +81,11 @@ impl ContractError {
             Self::WithdrawLocked => "WITHDRAW_LOCKED",
             Self::Unauthorized => "UNAUTHORIZED",
             Self::Paused => "PAUSED",
+            Self::PremiumMismatch => "PREMIUM_MISMATCH",
+            Self::TermsHashMismatch => "TERMS_HASH_MISMATCH",
+            Self::BadTermsJson => "BAD_TERMS_JSON",
+            Self::SwarmNotFound => "SWARM_NOT_FOUND",
+            Self::PoolNotFound => "POOL_NOT_FOUND",
         }
     }
 }
