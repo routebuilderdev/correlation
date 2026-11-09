@@ -1266,6 +1266,7 @@ Completion request (exact, minimal):
 
 ```json
 {"model":"z-ai/glm-5.3-flash","messages":[{"role":"system","content":"…"},{"role":"user","content":"…"}],"temperature":0,"max_tokens":64,"response_format":{"type":"json_schema","json_schema":{"name":"verdict","strict":true,"schema":{"type":"object","properties":{"n":{"type":"integer"},"a":{"type":"integer"}},"required":["n","a"],"additionalProperties":false}}}}
+```
 
 Completion response JSON must contain, after parsing:
 
@@ -1273,7 +1274,7 @@ Completion response JSON must contain, after parsing:
 {"n": 48271933, "a": 5120042}
 ```
 
-Nothing else. If the model wraps it in prose or fences, retry once with a stricter system prompt; if it does it again, that agent's receipt is `UNPARSEABLE` and counts as **no record**, not as a failure.
+With `strict: true` the model cannot wrap this in prose or fences, and `additionalProperties: false` blocks extra keys. If a response still fails to parse, do not loosen the schema silently: retry once, then record the receipt as `UNPARSEABLE`, which counts as **no record**, not as a failure. If every response is unparseable, `response_format` is not being honoured — re-run the D-5 probe before changing anything else.
 
 ## Appendix B — canonicalisation rules
 
