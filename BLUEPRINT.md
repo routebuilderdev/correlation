@@ -4,9 +4,9 @@
 **Written:** 2026-11-09
 **Deadline:** 2026-11-14T23:59:00Z — five days
 **Repo:** `/home/ubuntu/Code/NEAR_hackathon_2026`
-**Companion:** `the earlier design notes` (why), this file (what and how)
+**Scope:** self-contained build plan — what to build and how
 
-This is the build document. It is prescriptive on purpose: names, files, interfaces, order, acceptance criteria. Where it disagrees with `the earlier design notes`, **this file wins** — see §1.1.
+This is the build document. It is prescriptive on purpose: names, files, interfaces, order, acceptance criteria. It is the single source of truth; §1.1 records the assumptions it supersedes.
 
 ---
 
@@ -45,16 +45,16 @@ These are settled. Do not reopen them during the build; changes go in the decisi
 | **D10** | Chain writes signed by a backend testnet key; UI is read-mostly | Wallet selector is a day of work and a class of demo failures. | Disclose honestly; wallet connect is a stretch goal, not a dependency. |
 | **D11** | Trust root is the pinned `signing_public_key`; `compose_hash` is recorded evidence, never enforced | The measurement was observed to differ between candidates for the same model; the key did not. | Never reject a receipt on measurement mismatch. `provider=near` + `x-no-aliasing: true` on every call (§3.2.1). |
 
-### 1.1 What this supersedes in `the earlier design notes`
+### 1.1 Superseded assumptions
 
-| Research section | Was | Now |
+| Earlier assumption | Was | Now |
 |---|---|---|
-| §8.3 "Signature: Ed25519 or ECDSA" | Either | **ecdsa only** for the model signer; D5 |
-| §8.5 step 5 "verify against attested signer" | Implicit trust in submitted verdict | **Contract re-derives the verdict from bytes**; D7 |
-| research §8.6 receipt schema | Orchestrator submits `failure: true` | Orchestrator submits bytes; contract computes `failure`; D7, D9 |
-| §8.4 Option B (Phala) | Viable alternative | Dropped; D2 |
-| research §8.7 `post_receipt(policy_id, receipt, attestation)` | Struct of claims | `post_receipt(policy_id, agent_id, request_bytes, response_bytes, signature_json)` |
-| §6.5 "A failure can be…" | Any judged outcome | Demo: recomputed answer. Production: rubric hash in `terms_hash` |
+| Signature scheme | Either Ed25519 or ECDSA | **ecdsa only** for the model signer; D5 |
+| Verifying against the attested signer | Implicit trust in a submitted verdict | **Contract re-derives the verdict from bytes**; D7 |
+| Receipt schema | Orchestrator submits `failure: true` | Orchestrator submits bytes; contract computes `failure`; D7, D9 |
+| Confidential-compute option | Viable alternative | Dropped; D2 |
+| `post_receipt(policy_id, receipt, attestation)` | Struct of claims | `post_receipt(policy_id, agent_id, request_bytes, response_bytes, signature_json)` |
+| "A failure can be…" | Any judged outcome | Demo: recomputed answer. Production: rubric hash in `terms_hash` |
 
 ---
 
@@ -829,10 +829,6 @@ Everything to create. Existing files marked.
 NEAR_hackathon_2026/
 ├── .gitignore                              ✅ exists
 ├── AGENTS.md                               ✅ parent dir
-├── the earlier design notes                 ✅ exists
-├── the earlier competitor notes                 ✅ exists
-├── the earlier judging notes                      ✅ exists
-├── the earlier event notes              ✅ exists
 ├── BLUEPRINT.md                            ← this file
 ├── README.md                               ← §14
 ├── LICENSE                                 ← MIT
