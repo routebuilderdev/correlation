@@ -45,6 +45,7 @@ test("a run goes running -> complete -> evaluating -> triggered", async () => {
     runSwarm: async () => [result(0, true), result(1, false), result(2, true)],
     submitReceipt: async (r) => `tx-${r.agentId}`,
     evaluate: async () => "tx-evaluate",
+    claim: async () => "tx-claim",
     policyView: async () => ({ status: "Active" }),
   });
 
@@ -82,6 +83,7 @@ test("a duplicate receipt is not reported as an agent failure", async () => {
       throw new Error("E05 DUPLICATE");
     },
     evaluate: async () => "tx-evaluate",
+    claim: async () => "tx-claim",
     policyView: async () => ({}),
   });
 
@@ -99,6 +101,7 @@ test("rejects a bad mode and an unknown run", async () => {
     runSwarm: async () => [],
     submitReceipt: async () => "tx",
     evaluate: async () => "tx",
+    claim: async () => "tx-claim",
     policyView: async () => ({}),
   });
 
@@ -108,11 +111,34 @@ test("rejects a bad mode and an unknown run", async () => {
   await app.close();
 });
 
+test("claim returns the payout transaction and surfaces a contract refusal", async () => {
+  const app = buildServer({
+    runSwarm: async () => [],
+    submitReceipt: async () => "tx",
+    evaluate: async () => "tx",
+    claim: async (policyId) => {
+      if (policyId === 2) throw new Error("E02 NOT_ACTIVE");
+      return "tx-claim-1";
+    },
+    policyView: async () => ({}),
+  });
+
+  const paid = await app.inject({ method: "POST", url: "/api/claim", payload: { policyId: 1 } });
+  assert.equal(paid.statusCode, 200);
+  assert.equal(paid.json().txHash, "tx-claim-1");
+
+  const refused = await app.inject({ method: "POST", url: "/api/claim", payload: { policyId: 2 } });
+  assert.equal(refused.statusCode, 502);
+  assert.match(refused.json().error, /E02/);
+  await app.close();
+});
+
 test("health reports configuration without leaking the key", async () => {
   const app = buildServer({
     runSwarm: async () => [],
     submitReceipt: async () => "tx",
     evaluate: async () => "tx",
+    claim: async () => "tx-claim",
     policyView: async () => ({}),
   });
   const body = (await app.inject({ method: "GET", url: "/api/health" })).json();

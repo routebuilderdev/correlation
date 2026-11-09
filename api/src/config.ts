@@ -10,6 +10,9 @@ export const config = {
   // The evaluator posts receipts and calls evaluate; the buyer only claims.
   signerAccountId: process.env.EVAL_ACCOUNT ?? "",
   signerPrivateKey: process.env.EVAL_PRIVATE_KEY ?? "",
+  // Claiming is restricted to the buyer on chain, so it needs the buyer's key.
+  buyerAccountId: process.env.BUYER_ACCOUNT ?? "",
+  buyerPrivateKey: process.env.BUYER_PRIVATE_KEY ?? "",
   poolId: 1,
   /** Four at a time: twenty parallel requests is how demos get rate limited. */
   concurrency: 4,

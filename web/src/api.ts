@@ -54,7 +54,7 @@ export interface RunResponse {
   id: string;
   policyId: number;
   mode: "control" | "poisoned";
-  status: "running" | "complete" | "evaluating" | "triggered" | "error";
+  status: "running" | "complete" | "evaluating" |  "triggered" | "error";
   startedAt: string;
   error: string | null;
   evaluateTx: string | null;
@@ -74,6 +74,17 @@ export function fetchPolicy(policyId: number): Promise<PolicyResponse> {
 
 export function fetchRun(runId: string): Promise<RunResponse> {
   return getJson<RunResponse>(`/api/runs/${runId}`);
+}
+
+export async function claimPayout(policyId: number): Promise<string> {
+  const response = await fetch("/api/claim", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ policyId }),
+  });
+  const body = (await response.json()) as { txHash?: string; error?: string };
+  if (!response.ok) throw new Error(body.error ?? `claim ${response.status}`);
+  return body.txHash ?? "submitted";
 }
 
 export async function startRun(

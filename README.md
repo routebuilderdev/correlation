@@ -14,7 +14,7 @@ signed text from the raw request and response bytes, and recovers the signer key
 ```bash
 npm install                                   # shared, api, web
 cp .env.example .env                          # add NEARAI_API_KEY (never committed)
-npm test                                      # 23 TypeScript tests + 37 Rust tests
+npm test                                      # 24 TypeScript tests + 39 Rust tests
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
@@ -32,8 +32,8 @@ cd contract && cargo test && cargo build --release --target wasm32-unknown-unkno
 2. Press **Run control**. Twenty cells fill in; the index stays at 0%, the policy stays `Active`.
 3. Press **Run poisoned**. The system prompt gains one plausible-looking rounding instruction.
    Roughly a third of the agents now answer the same arithmetic question wrongly.
-4. The index crosses 25%, `evaluate` fires on chain, the policy reads `Triggered`, and `claim`
-   pays the limit to the buyer, capped by what the pool actually holds.
+4. The index crosses 25%, `evaluate` fires on chain, the policy reads `Triggered`, and the
+   **Claim payout** button pays the limit to the buyer, capped by what the pool actually holds.
 
 Both runs are the *same* model, the *same* prompt shape and the *same* task family. The only
 difference is one sentence of context.
@@ -93,6 +93,9 @@ same recovery (`shared/` is a mirror of `contract/src/verify.rs`).
 | buyer | `buyer.correlation.testnet` | buys cover, claims |
 | eval | `eval.correlation.testnet` | posts receipts, calls `evaluate` |
 
+The buyer's key is also needed by the API to call `claim`, since the contract restricts payouts to
+the buyer: `BUYER_ACCOUNT` and `BUYER_PRIVATE_KEY` in `.env`.
+
 Deployment is not done yet: this machine has neither `near-cli` nor a funded testnet account.
 `scripts/deploy.sh`, `register-signer.sh` and `seed-pool.sh` are ready for the moment it does.
 
@@ -113,9 +116,9 @@ Deployment is not done yet: this machine has neither `near-cli` nor a funded tes
 
 | Suite | Count | Covers |
 |---|---|---|
-| `contract` (Rust) | 37 | signature path, policy terms, pool limits, receipts, index, claim, expiry |
+| `contract` (Rust) | 39 | signature path, policy terms, pool limits, receipts, index, claim, expiry, full 20-receipt run |
 | `shared` | 9 | cross-language vectors pinned to the Rust fixture |
-| `api` | 14 | exact bytes, required headers, verifier parity incl. error codes, HTTP states |
+| `api` | 15 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim |
 
 `shared` and `api` deliberately assert the *same* error codes as the contract (`E07`, `E09`, `E10`,
 `E11`), so a divergence shows up as a failing test instead of a silent client-only pass.

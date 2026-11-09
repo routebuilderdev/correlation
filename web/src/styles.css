@@ -87,6 +87,12 @@ button:hover:not(:disabled) {
   border-color: #3a4250;
 }
 
+button.pay {
+  border-color: #1f4d3d;
+  background: #0e1f19;
+  color: var(--accent);
+}
+
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

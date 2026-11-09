@@ -24,6 +24,7 @@ export interface Deps {
   runSwarm: (options: SwarmOptions) => Promise<AgentResult[]>;
   submitReceipt: (result: AgentResult, policyId: number) => Promise<string>;
   evaluate: (policyId: number) => Promise<string>;
+  claim: (policyId: number) => Promise<string>;
   policyView: (policyId: number) => Promise<unknown>;
 }
 
@@ -140,6 +141,18 @@ export function buildServer(deps: Deps): FastifyInstance {
     },
   );
 
+  /** The final step a judge clicks: triggered -> paid. */
+  app.post<{ Body: { policyId?: number } }>("/api/claim", async (request, reply) => {
+    const policyId = Number(request.body?.policyId ?? 1);
+    try {
+      return { txHash: await deps.claim(policyId) };
+    } catch (error) {
+      return reply.status(502).send({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   app.get<{ Params: { id: string } }>("/api/runs/:id", async (request, reply) => {
     const run = runs.get(request.params.id);
     if (!run) return reply.status(404).send({ error: "unknown run" });
@@ -176,6 +189,7 @@ async function main(): Promise<void> {
         signatureJson: JSON.stringify(result.signature),
       }),
     evaluate: chain.evaluate,
+    claim: chain.claim,
     policyView: chain.policyView,
   });
 

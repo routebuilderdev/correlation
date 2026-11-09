@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  claimPayout,
   fetchPolicy,
   fetchRun,
   startRun,
@@ -117,6 +118,8 @@ export default function App() {
   const [policy, setPolicy] = useState<PolicyResponse | null>(null);
   const [run, setRun] = useState<RunResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimTx, setClaimTx] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadPolicy = useCallback(async () => {
@@ -158,6 +161,19 @@ export default function App() {
     }
   };
 
+  const pay = async () => {
+    setClaiming(true);
+    setError(null);
+    try {
+      setClaimTx(await claimPayout(POLICY_ID));
+      await loadPolicy();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   const view = policy?.policy;
   const pool = policy?.pool;
   const status = run?.status ?? view?.status?.toLowerCase() ?? "idle";
@@ -178,6 +194,11 @@ export default function App() {
           <button disabled={busy || running} onClick={() => void launch("poisoned")}>
             Run poisoned
           </button>
+          {view?.status === "Triggered" ? (
+            <button className="pay" disabled={claiming} onClick={() => void pay()}>
+              {claiming ? "Claiming…" : "Claim payout"}
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -198,6 +219,7 @@ export default function App() {
               <Row label="buyer" value={shortAccount(view.buyer)} />
               <Row label="terms hash" value={shortHash(view.terms_hash, 6)} />
               <Row label="paid" value={`${formatNear(view.paid_amount)} NEAR`} />
+              {claimTx ? <Row label="claim tx" value={shortHash(claimTx, 6)} /> : null}
             </>
           ) : (
             <p className="muted">Loading contract view…</p>

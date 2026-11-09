@@ -14,20 +14,28 @@ export interface ReceiptSubmission {
   signatureJson: string;
 }
 
-async function signer() {
-  if (!config.signerAccountId || !config.signerPrivateKey) {
-    throw new Error("SIGNER_ACCOUNT_ID and SIGNER_PRIVATE_KEY are required to submit");
+/** Only the buyer may claim, so the payout is signed with the buyer's key. */
+async function signerAs(accountId: string, privateKey: string) {
+  if (!accountId || !privateKey) {
+    throw new Error("an account id and private key are required to submit a transaction");
   }
   const { KeyPairSigner } = await import("@near-js/signers");
   const { Account } = await import("@near-js/accounts");
   const { JsonRpcProvider } = await import("@near-js/providers");
-  const key = await KeyPairSigner.fromSecretKey(config.signerPrivateKey as never);
+  const key = await KeyPairSigner.fromSecretKey(privateKey as never);
   const provider = new JsonRpcProvider({ url: config.rpcUrl });
-  return new Account(config.signerAccountId, provider, key);
+  return new Account(accountId, provider, key);
 }
 
-async function functionCall(method: string, args: Record<string, unknown>) {
-  const account = await signer();
+async function functionCall(
+  method: string,
+  args: Record<string, unknown>,
+  as: "evaluator" | "buyer" = "evaluator",
+) {
+  const account =
+    as === "buyer"
+      ? await signerAs(config.buyerAccountId, config.buyerPrivateKey)
+      : await signerAs(config.signerAccountId, config.signerPrivateKey);
   return account.callFunction({
     contractId: config.contractId,
     methodName: method,
@@ -35,6 +43,14 @@ async function functionCall(method: string, args: Record<string, unknown>) {
     gas: TGAS,
     deposit: 0n,
   });
+}
+
+/** Pays the buyer. The contract caps at available capital and freezes the NFT. */
+export async function claim(policyId: number): Promise<string> {
+  const result = (await withRetry(() =>
+    functionCall("claim", { policy_id: policyId }, "buyer"),
+  )) as { transaction_outcome?: { id?: string } };
+  return result.transaction_outcome?.id ?? "submitted";
 }
 
 /** Retry once on a transport error; never retry a receipt the chain accepted. */

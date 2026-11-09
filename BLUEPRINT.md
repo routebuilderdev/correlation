@@ -696,6 +696,13 @@ Traps, in order of how often they bite:
 
 T3 is the gate. Everything else is ordinary. If T3 fails, stop and resolve before writing more.
 
+**Status 2026-11-09, later the same day:** T1–T14 all pass, 39 tests total. T14 lives in
+`contract/tests/test_full_run.rs` and signs its twenty receipts in-test with `k256`, so no private
+key is committed and the signatures are real secp256k1 over the EIP-191 digest. The run ends with
+`total 91 NEAR` (100 deposited + 1 premium − 10 paid), `committed 0`, and the invariant checks
+`failed <= started <= swarm size`. A second case flips one byte in the last receipt and asserts it
+never counts.
+
 **Status 2026-11-09:** T3 passes in `cargo test` against a locally generated EIP-191 fixture
 (`contract/tests/fixtures/`), signed with the same secp256k1 scheme the model TEE uses. That
 settles `v` normalisation (27/28 → 0/1) and that `malleability_flag: false` recovers the key;
