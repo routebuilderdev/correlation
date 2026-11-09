@@ -12,12 +12,21 @@ signed text from the raw request and response bytes, and recovers the signer key
 ## Quick start
 
 ```bash
+./scripts/preflight.sh                        # says exactly what is missing, and how to fix it
+./scripts/go.sh                               # preflight, then serve api + ui
+
 npm install                                   # shared, api, web
 cp .env.example .env                          # add NEARAI_API_KEY (never committed)
 npm test                                      # 28 TypeScript tests (shared + api)
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
+
+`preflight.sh` checks the toolchain, the contract build, every required secret, testnet RPC, each
+account's existence and balance, whether the contract answers, and whether the model key is accepted
+(`402`/`429` there means NEAR has not issued credits yet — retry later, nothing else is blocked).
+`go.sh --capture` additionally replaces the synthetic fixture with a live one and re-runs the
+contract tests.
 
 Contract tests need the Rust 1.99 toolchain pinned in `contract/rust-toolchain.toml`:
 
