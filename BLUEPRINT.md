@@ -43,6 +43,7 @@ These are settled. Do not reopen them during the build; changes go in the decisi
 | **D8** | Pool denominated in native NEAR for the MVP | Removes a NEP-141 token dependency on testnet. | `token: Option<AccountId>` reserved for production; NEP-141 named as future work. |
 | **D9** | Demo failure predicate is objectively checkable by the contract | Removes "who decides failed?" — the contract recomputes the answer itself (§5.5). | Swarm task is arithmetic, not vibes. Production rubric described but not built. |
 | **D10** | Chain writes signed by a backend testnet key; UI is read-mostly | Wallet selector is a day of work and a class of demo failures. | Disclose honestly; wallet connect is a stretch goal, not a dependency. |
+| **D11** | Trust root is the pinned `signing_public_key`; `compose_hash` is recorded evidence, never enforced | The measurement was observed to differ between candidates for the same model; the key did not. | Never reject a receipt on measurement mismatch. `provider=near` + `x-no-aliasing: true` on every call (§3.2.1). |
 
 ### 1.1 What this supersedes in `the earlier design notes`
 
@@ -127,6 +128,34 @@ model_attestations[0].info.mr_aggregated
 
 Gateway and OHTTP keys are `ed25519`. Only the **model** signer is `ecdsa`. Any code touching both must handle both curves.
 
+**Selection, probed 2026-11-09** (public catalog + attestation, no key):
+
+| | `z-ai/glm-5.3-flash` | `Qwen/Qwen3.8-27B` |
+|---|---|---|
+| `is_ready` | yes | yes |
+| signer | ecdsa `0x3b75…fa0c` | ecdsa `0x835a…aa26` |
+| `supported_features` | `tools`, **`structured_outputs`**, `reasoning`, **`json_mode`** | `tools`, **`structured_outputs`**, `reasoning` |
+| price in/out per 1M | $0.08 / $0.50 | $0.04 / $1.35 |
+| context | 1,048,576 | 262,144 |
+
+Consequences:
+
+- The primary model supports constrained decoding, so the verdict can be a **JSON-Schema-constrained** object rather than a hope. This removes most of error E12.
+- `deepseek-ai/DeepSeek-V4.1-Flash-1017` has a signer but **no `structured_outputs`**, so it is no longer the fallback. `Qwen/Qwen3.8-27B` is: cheaper input, same constraint support, separate signer.
+- `z-ai/glm-5.3` is `owned_by: "attested 3p"` and `z-ai/glm-5.3-flash` is `nearai`. Only the `nearai`-owned one exposes a model signer — this is the `provider` distinction the docs warn about.
+
+### 3.2.1 Canonical model identity
+
+Two probed behaviours change the client:
+
+| Behaviour | Evidence | Consequence |
+|---|---|---|
+| Aliasing can rewrite the model ID | docs: *"send the completion with the same canonical model ID and `x-no-aliasing: true`"* | Send `x-no-aliasing: true` on every completion. The model ID is inside the signed text; a rewritten alias is a guaranteed `TEXT_MISMATCH`. |
+| `provider=near` selects the NEAR-hosted deployment | `?model=z-ai/glm-5.3-flash&provider=near` returned a different `compose_hash` than the same call without it | Pass `provider=near` when requesting attestation, and verify **every** returned candidate. |
+| `compose_hash` is not stable across candidates | observed `e8416a02…` vs `a0e3c6f4…` for the same model name minutes apart | **Authority is the `signing_public_key`, not the measurement.** Record `compose_hash` as evidence; never gate a receipt on it. |
+
+That last row matters. It means the contract's trust root must be a pinned 64-byte key, which is already what D5 and §6.5 do.
+
 ### 3.3 Environment
 
 | Item | Value |
@@ -149,12 +178,16 @@ Gateway and OHTTP keys are `ed25519`. Only the **model** signer is `ecdsa`. Any 
 | Faucet | ~10 claims/day, 60-minute cooldown; `near create-account <id>.testnet --useFaucet` → 10 NEAR |
 | 1Click Intents | mainnet only — not used |
 | Storage | ~1 NEAR ≈ 100 KB |
+| Run cost | 20 agents × ~250 in / 40 out tokens ≈ $0.0008 per run at `glm-5.3-flash` rates. A hundred rehearsals cost cents. |
+| Rate limits | **Not published.** Terms reference "applicable rate limits" without numbers. Assume they exist: concurrency 4, exponential backoff, abort the run rather than degrade it. |
 
 ### 3.5 Still unproven
 
 | Unknown | Why it matters | How it gets settled |
 |---|---|---|
 | A live completion returns `signature_kind: "provider_tee"` / `ecdsa` with reproducible text | Whole design rests on it | Run `spike/verify-receipt.mjs` with a key (§12 D-5) |
+| `response_format` does not force a gateway signature | Constrained decoding must still be provider-signed | Probe on D-5: same call with and without `response_format` |
+| `x-no-aliasing: true` is honoured on Chat Completions | Otherwise the signed model ID may differ | Probe on D-5; log the signature `text` and diff the prefix |
 | `env::ecrecover` `v` convention (0/1 vs 27/28) and `malleability_flag` | Wrong guess = every receipt fails | Fixture test with a real signature (§6.12 T3) |
 | Model stays available through judging | Demo dies on stage | Pin two models, re-attest morning of judging |
 
@@ -238,7 +271,7 @@ Gateway and OHTTP keys are `ed25519`. Only the **model** signer is `ecdsa`. Any 
 ### 5.2 Receipt lifecycle, numbered
 
 1. Orchestrator builds agent `i`'s prompt. Prompt **must** contain `policy_id`, `agent_id`, `window_start_ns` and the task input, in a canonical form.
-2. Orchestrator sends it to the pinned model with `temperature: 0`, `max_tokens` fixed, `Accept-Encoding: identity`, body as an exact string.
+2. Orchestrator sends it to the pinned model with `temperature: 0`, `max_tokens` fixed, `Accept-Encoding: identity`, `x-no-aliasing: true`, `provider=near`, a `response_format` JSON schema, and the body as an exact string.
 3. It reads the response as **bytes** (`arrayBuffer`), never re-serialises.
 4. It fetches `GET /v1/signature/{id}?model={model}&signing_algo=ecdsa`.
 5. It asserts `signature_kind === "provider_tee"` and `signing_algo === "ecdsa"`. If not, the run aborts — never silently degrades to a gateway receipt.
@@ -641,12 +674,22 @@ export function signedText(modelId: string, req: Uint8Array, res: Uint8Array): s
 export function eip191Digest(text: string): Uint8Array;    // keccak256, 32 bytes
 export const TASK_MOD: number = 1_000_003;
 export function expectedAnswer(n: number): number;         // (n * 37) % TASK_MOD
+
+export const VERDICT_SCHEMA = {
+  type: "object",
+  properties: { n: { type: "integer" }, a: { type: "integer" } },
+  required: ["n", "a"],
+  additionalProperties: false,
+} as const;
 ```
 
 Rules:
 
 - Never `JSON.parse` then `JSON.stringify` before hashing. Hash the bytes as received.
 - Always send `Accept-Encoding: identity`.
+- Always send `x-no-aliasing: true` and `provider=near` (§3.2.1).
+- Always send `response_format: {type:"json_schema", json_schema:{name:"verdict", strict:true, schema:VERDICT_SCHEMA}}`. Strict schema means the model cannot return prose, fences or extra keys.
+- Model ID used in `signedText` must be the **canonical ID from the response**, not the alias you typed, if the two ever differ.
 - Build the request body once as a string, send that string, hash that string.
 - Store `requestBytes` and `responseBytes` alongside the signature so a run can be replayed in tests.
 
@@ -657,6 +700,8 @@ Rules:
 export async function completeExact(model: string, bodyString: string): Promise<{
   id: string; requestBytes: Uint8Array; responseBytes: Uint8Array; parsed: any;
 }>;
+// headers sent: Authorization, Content-Type, Accept-Encoding: identity,
+//               x-no-aliasing: true, provider=near
 
 // verify.ts
 export async function fetchSignature(id: string, model: string, algo: "ecdsa"): Promise<SignatureRecord>;
@@ -847,7 +892,7 @@ NEAR_hackathon_2026/
 │       ├── config.ts
 │       ├── store.ts
 │       ├── nearai/
-│       │   ├── client.ts
+││       ├── client.ts
 │       │   └── verify.ts
 │       ├── swarm/
 │       │   ├── task.ts
@@ -954,7 +999,8 @@ Sub-accounts are a NEAR primitive worth showing: the pool, the buyer and the eva
 NEARAI_API_KEY=
 NEARAI_BASE_URL=https://cloud-api.near.ai/v1
 NEARAI_MODEL=z-ai/glm-5.3-flash
-NEARAI_MODEL_FALLBACK=deepseek-ai/DeepSeek-V4.1-Flash-1017
+NEARAI_MODEL_FALLBACK=Qwen/Qwen3.8-27B
+NEARAI_PROVIDER=near
 NEARAI_SIGNING_ALGO=ecdsa
 
 # --- chain ---
@@ -992,7 +1038,8 @@ Each day has an acceptance criterion. Do not start the next day until the criter
 | 1 | Obtain `NEARAI_API_KEY` | `spike/verify-receipt.mjs` exits 0 |
 | 2 | Capture a real receipt into `contract/tests/fixtures/` | request.bin, response.bin, signature.json exist |
 | 3 | Settle `ecrecover` semantics | a Rust unit test recovers the fixture's key |
-| 4 | `cargo install cargo-near`; create testnet accounts | `near state correlation.testnet` works |
+| 4 | Confirm `response_format` + `x-no-aliasing` still yield `provider_tee`/`ecdsa` | signature JSON says `provider_tee`, `text` prefix matches the canonical model ID |
+| 5 | `cargo install cargo-near`; create testnet accounts | `near state correlation.testnet` works |
 
 **Gate:** if #1 or #3 fails, stop and write `BLOCKED.md`. Do not build the contract on an unverified signature assumption.
 
@@ -1053,6 +1100,7 @@ Each day has an acceptance criterion. Do not start the next day until the criter
 | Unit (Rust) | T1–T14 | `cargo test` in sandbox | every commit |
 | Fixture | Real receipt verifies | T3 with captured bytes | D-5, then as a regression |
 | Cross-language | JS and Rust agree | `shared/test/vectors.test.ts` against the same fixture | D-2 |
+| Schema conformance | 20/20 responses parse under the strict schema, no prose or fences | assertion inside `runSwarm` | D-2 |
 | Integration | 20 receipts → trigger → claim | localnet or testnet, scripted | D-3 |
 | E2E | Full demo run | `scripts/demo.sh` on testnet | D-1 |
 | Rehearsal | Three consecutive clean runs | manual, timed | D-1 |
@@ -1144,6 +1192,7 @@ Ninety seconds. No intro music. No logo animation.
 | 2 | Model ineligible or signer disappears | Medium | Fatal | Two pinned NEAR-hosted models; survey re-run before build | no signer → switch model |
 | 3 | `ecrecover` semantics wrong | Medium | Fatal | Fixture test settles it on D-5 | T3 fails → BLOCKED.md |
 | 4 | Model rate limits / retirement | High | High | concurrency 4, retry, fallback model, pre-recorded run | 429 twice → fallback |
+| 4b | Structured output changes signature kind | Low | High | D-5 probe compares signed `text` with and without `response_format` | `text` prefix wrong → drop `response_format` |
 | 5 | Faucet / deploy unavailable | Low | Fatal | Accounts created D-5, not D0 | can't deploy → localnet demo |
 | 6 | UI overruns | Medium | Medium | Ugly-first on D-1 morning; no animation | not rendering by 14:00 → cut components |
 | 7 | Demo shows 0 failures | Medium | High | Freeze poison string after tuning; verify 3 rehearsals | run fails twice → adjust string |
@@ -1187,9 +1236,18 @@ Only #1, #2 and #3 are irreversible within the sprint. Everything else is recove
 
 ```http
 GET  /v1/models                                      # public
-GET  /v1/attestation/report?model={id}               # public
+GET  /v1/attestation/report?model={id}&provider=near # public
 POST /v1/chat/completions                            # Bearer key, non-streaming
 GET  /v1/signature/{completion_id}?model={id}&signing_algo=ecdsa
+```
+
+Required headers on the completion:
+
+```http
+Authorization: Bearer <key>
+Content-Type: application/json
+Accept-Encoding: identity
+x-no-aliasing: true
 ```
 
 Signature record:
@@ -1207,8 +1265,7 @@ Signature record:
 Completion request (exact, minimal):
 
 ```json
-{"model":"z-ai/glm-5.3-flash","messages":[{"role":"system","content":"…"},{"role":"user","content":"…"}],"temperature":0,"max_tokens":64}
-```
+{"model":"z-ai/glm-5.3-flash","messages":[{"role":"system","content":"…"},{"role":"user","content":"…"}],"temperature":0,"max_tokens":64,"response_format":{"type":"json_schema","json_schema":{"name":"verdict","strict":true,"schema":{"type":"object","properties":{"n":{"type":"integer"},"a":{"type":"integer"}},"required":["n","a"],"additionalProperties":false}}}}
 
 Completion response JSON must contain, after parsing:
 
@@ -1267,3 +1324,4 @@ Show that last line on a slide. A judge who sees the LP lose money trusts the me
 | 2026-11-09 | D8 | Pool in native NEAR | accepted |
 | 2026-11-09 | D9 | Objectively checkable demo predicate | accepted |
 | 2026-11-09 | D10 | Backend-signed chain writes | accepted |
+| 2026-11-09 | D11 | Pin the key, record the measurement | accepted |
