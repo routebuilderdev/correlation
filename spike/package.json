@@ -1,0 +1,13 @@
+{
+  "name": "correlation-tee-spike",
+  "private": true,
+  "type": "module",
+  "description": "Determines whether a NEAR AI Cloud response receipt can be verified from raw bytes plus the signer key alone.",
+  "scripts": {
+    "spike": "node verify-receipt.mjs"
+  },
+  "dependencies": {
+    "@nearai/inference-sdk": "^0.3.0",
+    "ethers": "^6.17.0"
+  }
+}
