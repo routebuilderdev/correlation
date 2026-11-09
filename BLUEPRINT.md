@@ -981,6 +981,26 @@ Do not add: a database, an ORM, a component library, a state manager, `axios` (u
 
 ## 10. Environment and accounts
 
+### 10.0 API credits — free for this event
+
+The official rules file (`nearhackathon.com/HACKATHON.md`) answers this in Q-000:
+
+> **NEAR AI credits?** Buy with crypto or card in the NEAR AI Cloud dashboard, **or claim $10 by joining NEAR Builders** (https://nearbuilders.org/join). Generate the API key in the dashboard.
+
+So register as a NEAR Builder, claim the credit, and generate the key there. No card needed.
+
+What $10 buys at `glm-5.3-flash` rates ($0.08 / $0.50 per 1M tokens):
+
+| | Cost | Covered by $10 |
+|---|---|---|
+| One spike call | ≈ $0.00005 | ~200,000 calls |
+| One 20-agent demo run | ≈ $0.001 | ~10,000 runs |
+| Whole build + rehearsals | well under $1 | < 10% of the credit |
+
+The credit is not the constraint. Do not optimise for tokens; optimise for getting the fixture captured.
+
+If the Builder claim is not available, the fallback is staking NEAR through the dashboard (rewards, not principal, become credits) — that needs mainnet NEAR and is not worth it for a five-day build. Buying the smallest top-up is cheaper than staking.
+
 ### 10.1 Testnet accounts
 
 ```bash
@@ -1208,7 +1228,7 @@ Only #1, #2 and #3 are irreversible within the sprint. Everything else is recove
 
 | # | Item | Owner | Blocks |
 |---|---|---|---|
-| 1 | `NEARAI_API_KEY` | you | live spike, fixtures, everything downstream |
+| 1 | `NEARAI_API_KEY` — claim the $10 Builder credit (§10.0) | you | live spike, fixtures, everything downstream |
 | 2 | Decide fallback model after a live run | build | risk #2 |
 | 3 | Confirm `ecrecover` `v` / `malleability_flag` | build | T3 |
 | 4 | Confirm testnet faucet limits | build | account creation |
