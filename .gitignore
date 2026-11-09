@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+target/
+*.wasm.b64
+
+# local secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# verifier scratch output
+spike/out/
+*.log
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/
