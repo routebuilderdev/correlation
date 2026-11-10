@@ -29,7 +29,9 @@ const TGAS = 10n ** 12n;
 const RESERVE = (15n * YOCTO) / 10n;
 const PREMIUM = YOCTO / 10n; // 0.1 NEAR
 const WINDOW_LEAD_NS = 60n * 10n ** 9n;
-const WINDOW_LENGTH_NS = 1800n * 10n ** 9n;
+// An hour: twenty real completions take minutes, and a policy that expires while
+// the run is still posting receipts would reject them for the wrong reason.
+const WINDOW_LENGTH_NS = 3600n * 10n ** 9n;
 const GRACE_NS = 300n * 10n ** 9n;
 
 const AGENTS = Array.from(

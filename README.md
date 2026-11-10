@@ -9,6 +9,21 @@ The point is not that an agent failed. It is that *the swarm* failed together, a
 provable without trusting an oracle: the contract re-derives the expected task input, rebuilds the
 signed text from the raw request and response bytes, and recovers the signer key on chain.
 
+## Proven on testnet
+
+This is not a plan: policy #3 on `correlation.testnet` ran the whole path with live traffic.
+
+| Step | Result |
+|---|---|
+| Twenty agents against `z-ai/glm-5.3-flash`, poisoned arm | 20 completions, 20 signed by the model TEE |
+| Receipts posted | 20 accepted, 18 re-derived as failed |
+| Index | 9000 bps against a 2500 bps trigger |
+| `evaluate` | policy moved `Triggered` |
+| `claim` | 7.8284 NEAR paid of a 7.8284 NEAR limit; pool left 0.9698 |
+
+Every number above comes from a signed receipt: the contract rejected nothing it could not verify, and
+the payout is the contract's arithmetic, not the orchestrator's claim.
+
 ## Quick start
 
 ```bash

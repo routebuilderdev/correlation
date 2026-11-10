@@ -45,30 +45,42 @@ async function signerAs(accountId: string, privateKey: string) {
   return created;
 }
 
+/**
+ * Sign and send one function call, returning its transaction hash.
+ *
+ * `Account.callFunction` hides the hash in a shape its own types do not expose,
+ * which left the UI (and the receipts table) showing "submitted". Building the
+ * action here gives the hash a caller can paste into an explorer.
+ */
 async function functionCall(
   method: string,
   args: Record<string, unknown>,
   as: "evaluator" | "buyer" = "evaluator",
-) {
+  deposit = 0n,
+): Promise<string> {
   const account =
     as === "buyer"
       ? await signerAs(config.buyerAccountId, config.buyerPrivateKey)
       : await signerAs(config.signerAccountId, config.signerPrivateKey);
-  return account.callFunction({
-    contractId: config.contractId,
-    methodName: method,
-    args,
-    gas: TGAS,
-    deposit: 0n,
+  const { actionCreators } = await import("@near-js/transactions");
+  const outcome = await account.signAndSendTransaction({
+    receiverId: config.contractId,
+    actions: [
+      actionCreators.functionCall(
+        method,
+        new TextEncoder().encode(JSON.stringify(args)),
+        TGAS,
+        deposit,
+      ),
+    ],
+    waitUntil: "INCLUDED_FINAL",
   });
+  return outcome.transaction_outcome?.id ?? "";
 }
 
 /** Pays the buyer. The contract caps at available capital and freezes the NFT. */
 export async function claim(policyId: number): Promise<string> {
-  const result = (await withRetry(() =>
-    functionCall("claim", { policy_id: policyId }, "buyer"),
-  )) as { transaction_outcome?: { id?: string } };
-  return result.transaction_outcome?.id ?? "submitted";
+  return withRetry(() => functionCall("claim", { policy_id: policyId }, "buyer"));
 }
 
 /**
@@ -94,7 +106,7 @@ async function withRetry<T>(run: () => Promise<T>): Promise<T> {
 }
 
 export async function postReceipt(a: ReceiptSubmission): Promise<string> {
-  const result = (await withRetry(() =>
+  return withRetry(() =>
     functionCall("post_receipt", {
       policy_id: a.policyId,
       agent_id: a.agentId,
@@ -103,24 +115,15 @@ export async function postReceipt(a: ReceiptSubmission): Promise<string> {
       response_bytes: Array.from(a.responseBytes),
       signature_json: a.signatureJson,
     }),
-  )) as { transaction_outcome?: { id?: string } } | string;
-
-  if (typeof result === "string") return result;
-  return result.transaction_outcome?.id ?? "submitted";
+  );
 }
 
 export async function evaluate(policyId: number): Promise<string> {
-  const result = (await withRetry(() => functionCall("evaluate", { policy_id: policyId }))) as {
-    transaction_outcome?: { id?: string };
-  };
-  return result.transaction_outcome?.id ?? "submitted";
+  return withRetry(() => functionCall("evaluate", { policy_id: policyId }));
 }
 
 export async function expire(policyId: number): Promise<string> {
-  const result = (await withRetry(() => functionCall("expire", { policy_id: policyId }))) as {
-    transaction_outcome?: { id?: string };
-  };
-  return result.transaction_outcome?.id ?? "submitted";
+  return withRetry(() => functionCall("expire", { policy_id: policyId }));
 }
 
 /** One round trip for the UI: policy terms and pool state move together. */
