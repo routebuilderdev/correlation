@@ -35,6 +35,7 @@ export async function completeExact(model: string, bodyString: string): Promise<
       provider: "near",
     },
     body: bodyString,
+    signal: AbortSignal.timeout(config.completionTimeoutMs),
   });
 
   const requestBytes = new TextEncoder().encode(bodyString);

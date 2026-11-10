@@ -2,7 +2,12 @@ import { VERDICT_SCHEMA, expectedAnswer, taskInput } from "@correlation/shared";
 
 import { config } from "../config.ts";
 import { completeExact } from "../nearai/client.ts";
-import { fetchSignature, verifyLocally, type SignatureRecord } from "../nearai/verify.ts";
+import {
+  SignatureUnavailable,
+  fetchSignature,
+  verifyLocally,
+  type SignatureRecord,
+} from "../nearai/verify.ts";
 import { systemPrompt } from "./poison.ts";
 import { agentId, promptFor } from "./task.ts";
 
@@ -28,6 +33,8 @@ export interface SwarmOptions {
   poison: boolean;
   concurrency?: number;
   model?: string;
+  /** Fires as each agent settles, so the UI fills in instead of waiting. */
+  onAgent?: (result: AgentResult) => void;
 }
 
 /**
@@ -75,27 +82,42 @@ async function runAgent(
     signature: null,
   };
 
-  try {
-    const completion = await completeExact(model, body);
-    result.completionId = completion.id;
-    result.responseBytes = completion.responseBytes;
+  // A completion is only useful to us if it is signed. When NEAR AI is busy, a
+  // request can be served outside the enclave: the answer looks fine and its
+  // signature never appears, so it has to be asked again rather than recorded as
+  // a failure. Deterministic verification failures are never retried.
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= config.swarmAttempts; attempt += 1) {
+    try {
+      const completion = await completeExact(model, body);
+      result.completionId = completion.id;
+      result.responseBytes = completion.responseBytes;
 
-    const record = await fetchSignature(completion.id, model, "ecdsa");
-    result.signature = record;
-    const verified = await verifyLocally(
-      record,
-      completion.requestBytes,
-      completion.responseBytes,
-      model,
-      undefined,
-    );
-    result.answer = verified.verdict.a;
-    result.ok = verified.ok;
-    if (!verified.ok) result.error = "wrong answer";
-  } catch (error) {
-    result.error = error instanceof Error ? error.message : String(error);
+      const record = await fetchSignature(completion.id, model, "ecdsa");
+      result.signature = record;
+      const verified = await verifyLocally(
+        record,
+        completion.requestBytes,
+        completion.responseBytes,
+        model,
+        undefined,
+      );
+      result.answer = verified.verdict.a;
+      result.ok = verified.ok;
+      if (!verified.ok) result.error = "wrong answer";
+      return result;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable =
+        error instanceof SignatureUnavailable ||
+        /aborted due to timeout|fetch failed|ECONN/i.test(message);
+      if (!retryable) break;
+    }
   }
 
+  result.error =
+    lastError instanceof Error ? lastError.message : String(lastError);
   return result;
 }
 
@@ -110,12 +132,20 @@ export async function runSwarm(options: SwarmOptions): Promise<AgentResult[]> {
   async function worker(): Promise<void> {
     while (cursor < indices.length) {
       const index = indices[cursor++]!;
-      results[index] = await runAgent(options.policyId, index, options.poison, model);
+      results[index] = await runAgent(
+        options.policyId,
+        index,
+        options.poison,
+        model,
+      );
+      options.onAgent?.(results[index]!);
     }
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, indices.length) }, () => worker()),
+    Array.from({ length: Math.min(concurrency, indices.length) }, () =>
+      worker(),
+    ),
   );
   return results;
 }

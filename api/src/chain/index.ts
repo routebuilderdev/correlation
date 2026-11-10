@@ -14,17 +14,35 @@ export interface ReceiptSubmission {
   signatureJson: string;
 }
 
+/**
+ * One Account per role, cached.
+ *
+ * A fresh Account reads the access-key nonce from the network before signing,
+ * and twenty receipts submitted in a row read the same stale nonce: sixteen of
+ * them were rejected as "must be larger than nonce of the used access key".
+ * The cached instance keeps its own incrementing nonce, which is what the
+ * chain expects for a burst of transactions from one key.
+ */
+const accounts = new Map<string, Promise<unknown>>();
+
 /** Only the buyer may claim, so the payout is signed with the buyer's key. */
 async function signerAs(accountId: string, privateKey: string) {
   if (!accountId || !privateKey) {
     throw new Error("an account id and private key are required to submit a transaction");
   }
-  const { KeyPairSigner } = await import("@near-js/signers");
-  const { Account } = await import("@near-js/accounts");
-  const { JsonRpcProvider } = await import("@near-js/providers");
-  const key = await KeyPairSigner.fromSecretKey(privateKey as never);
-  const provider = new JsonRpcProvider({ url: config.rpcUrl });
-  return new Account(accountId, provider, key);
+  const cached = accounts.get(accountId);
+  if (cached) return cached as Promise<import("@near-js/accounts").Account>;
+
+  const created = (async () => {
+    const { KeyPairSigner } = await import("@near-js/signers");
+    const { Account } = await import("@near-js/accounts");
+    const { JsonRpcProvider } = await import("@near-js/providers");
+    const key = await KeyPairSigner.fromSecretKey(privateKey as never);
+    const provider = new JsonRpcProvider({ url: config.rpcUrl });
+    return new Account(accountId, provider, key);
+  })();
+  accounts.set(accountId, created);
+  return created;
 }
 
 async function functionCall(
@@ -53,16 +71,26 @@ export async function claim(policyId: number): Promise<string> {
   return result.transaction_outcome?.id ?? "submitted";
 }
 
-/** Retry once on a transport error; never retry a receipt the chain accepted. */
+/**
+ * Retry transport failures and nonce collisions; never retry a receipt the
+ * chain accepted. A nonce collision means a previous send is still settling, so
+ * it needs a pause rather than an immediate second attempt.
+ */
 async function withRetry<T>(run: () => Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const transient = /fetch|ECONN|timeout|502|503|504/i.test(message);
-    if (!transient) throw error;
-    return run();
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const transient = /fetch|ECONN|timeout|502|503|504/i.test(message);
+      const nonce = /must be larger than nonce/i.test(message);
+      if (!transient && !nonce) throw error;
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, nonce ? 2_000 : 500));
+    }
   }
+  throw lastError;
 }
 
 export async function postReceipt(a: ReceiptSubmission): Promise<string> {

@@ -101,7 +101,7 @@ fn t14_twenty_signed_receipts_trigger_and_pay() {
         "swarm-1".to_string(),
         SwarmFingerprint {
             model_id: MODEL.to_string(),
-            prompt_hash: [3u8; 32],
+            prompt_hash: "03".repeat(32),
             agent_ids: (1..=AGENTS).map(|i| format!("agent-{i:02}")).collect(),
         },
     );
@@ -194,7 +194,7 @@ fn t14_a_tampered_receipt_never_counts() {
         "swarm-1".to_string(),
         SwarmFingerprint {
             model_id: MODEL.to_string(),
-            prompt_hash: [3u8; 32],
+            prompt_hash: "03".repeat(32),
             agent_ids: (1..=AGENTS).map(|i| format!("agent-{i:02}")).collect(),
         },
     );

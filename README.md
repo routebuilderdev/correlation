@@ -47,8 +47,10 @@ T3 against bytes the model TEE actually signed.
 
 ## The 60-second demo
 
-1. Open `http://localhost:5173`. The policy panel shows 10 NEAR limit, 1 NEAR premium,
-   2500 bps trigger, 16-of-20 receipts required, model `z-ai/glm-5.3-flash`.
+1. Open `http://localhost:5173`. The policy panel shows the limit, premium, 2500 bps trigger,
+   16-of-20 receipts required and the model `z-ai/glm-5.3-flash`. The numbers come from what the
+   pool actually holds: a testnet faucet gives each account 10 NEAR, so the seed script deposits
+   about 8.5 NEAR and writes a 0.1 NEAR premium against a limit of 90% of the free capital.
 2. Press **Run control**. Twenty cells fill in; the index stays at 0%, the policy stays `Active`.
 3. Press **Run poisoned**. The system prompt gains one plausible-looking rounding instruction.
    Roughly a third of the agents now answer the same arithmetic question wrongly.
@@ -57,6 +59,22 @@ T3 against bytes the model TEE actually signed.
 
 Both runs are the *same* model, the *same* prompt shape and the *same* task family. The only
 difference is one sentence of context.
+
+### What the live network does that a plan does not
+
+Three things only showed up against the real endpoint, and each is handled in code rather than in
+the demo script:
+
+- **A completion is not always signed.** Under load NEAR AI can serve a request outside the TEE:
+  the answer is fine, the signature never appears, and the chat id is gone for good. Those
+  completions are asked for again (`SWARM_ATTEMPTS`, default 3) instead of being recorded as
+  failures, and parallelism is kept at 2 (`SWARM_CONCURRENCY`) because more of it means more
+  unsigned answers.
+- **A signature appears a moment later.** The first `GET /signature/:id` legitimately 404s, so the
+  verifier polls (`NEARAI_SIGNATURE_ATTEMPTS`, 10 attempts 1.5 s apart).
+- **A burst of transactions collides on the nonce.** Twenty receipts in a row from one key re-read
+  the same access-key nonce and get rejected as "must be larger than nonce of the used access key".
+  The submitter caches one `Account` per role and retries a collision after a pause.
 
 ## Architecture
 
@@ -96,8 +114,8 @@ same recovery (`shared/` is a mirror of `contract/src/verify.rs`).
 - **Basis risk.** The index counts wrong answers on one synthetic arithmetic task. Real agent
   failures are messier: partial completions, timeouts, tool errors. This is a prototype of the
   mechanism, not of the loss distribution.
-- **No loss history.** There is no actuarial model behind the 1 NEAR premium for 10 NEAR of cover;
-  the numbers are chosen to make the demo legible.
+- **No loss history.** There is no actuarial model behind the premium; it is a round number chosen
+  so the demo is legible, not a price.
 - **TEE attestation is checked once per signer per day**, not per receipt. It answers "is this the
   model it claims to be", not "did this specific call happen".
 - **Testnet only.** No real funds, no audits, no upgrade path, single pool (`pool_id = 1`).
@@ -109,15 +127,25 @@ same recovery (`shared/` is a mirror of `contract/src/verify.rs`).
 | Role | Account | Purpose |
 |---|---|---|
 | contract | `correlation.testnet` | policies, pool, index, payouts |
-| lp | `lp.correlation.testnet` | deposits capital |
-| buyer | `buyer.correlation.testnet` | buys cover, claims |
-| eval | `eval.correlation.testnet` | posts receipts, calls `evaluate` |
+| lp | `correlation-lp.testnet` | deposits capital |
+| buyer | `correlation-buyer.testnet` | buys cover, claims |
+| eval | `correlation-eval.testnet` | posts receipts, calls `evaluate` |
 
-The buyer's key is also needed by the API to call `claim`, since the contract restricts payouts to
-the buyer: `BUYER_ACCOUNT` and `BUYER_PRIVATE_KEY` in `.env`.
+The accounts are top-level, not subaccounts: the testnet faucet only funds top-level names. The
+buyer's key is also needed by the API to call `claim`, since the contract restricts payouts to the
+buyer: `BUYER_ACCOUNT` and `BUYER_PRIVATE_KEY` in `.env`.
 
-Deployment is not done yet: this machine has neither `near-cli` nor a funded testnet account.
-`scripts/deploy.sh`, `register-signer.sh` and `seed-pool.sh` are ready for the moment it does.
+The contract is deployed and seeded on testnet. Two commands do everything, with no `near-cli`
+(a dependency this machine does not have — `@near-js` is used instead):
+
+```bash
+npm run testnet --workspace @correlation/api   # create + fund accounts, deploy, write .env
+npm run seed --workspace @correlation/api      # signer, pool capital, swarm, policy
+```
+
+`seed` is idempotent and derives its amounts from the LP balance, so re-running it never overspends.
+It reuses a policy whose window is still open and retires one whose window has closed; `-- --new`
+buys a fresh policy regardless, which is what a second demo run needs.
 
 ## Repository layout
 
@@ -130,7 +158,7 @@ Deployment is not done yet: this machine has neither `near-cli` nor a funded tes
 | `api/` | exact-bytes client, local verifier, 20-agent swarm, chain submission, Fastify server |
 | `web/` | one page: policy, index gauge, swarm grid, receipts |
 | `spike/` | untouched standalone verifier used to capture the first real receipt |
-| `scripts/` | deploy, register signer, seed pool, run demo |
+| `scripts/` | deploy, preflight, one-command demo; signer and seeding live in `api/scripts/` |
 
 ## Tests
 

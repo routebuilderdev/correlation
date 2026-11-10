@@ -67,23 +67,35 @@ export async function fetchSignature(
   }
   url.searchParams.set("signing_algo", algo);
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${requireApiKey()}`,
-      "Accept-Encoding": "identity",
-      "x-no-aliasing": "true",
-    },
-  });
-  if (response.status === 404) {
-    throw new SignatureUnavailable(id);
-  }
-  if (!response.ok) {
-    throw new Error(`signature ${response.status} for completion ${id}`);
+  // The TEE publishes the signature a moment after the completion is returned,
+  // so the first fetch legitimately 404s. Polling is the intended protocol:
+  // twenty agents fetching once would otherwise report "unsigned" for work that
+  // was in fact signed a second later.
+  for (let attempt = 1; attempt <= config.signatureAttempts; attempt += 1) {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${requireApiKey()}`,
+        "Accept-Encoding": "identity",
+        "x-no-aliasing": "true",
+      },
+      signal: AbortSignal.timeout(config.signatureTimeoutMs),
+    });
+
+    if (response.status === 404) {
+      if (attempt === config.signatureAttempts) throw new SignatureUnavailable(id);
+      await new Promise((resolve) => setTimeout(resolve, config.signatureRetryMs));
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`signature ${response.status} for completion ${id}`);
+    }
+
+    const record = (await response.json()) as SignatureRecord;
+    signatureCache.set(id, record);
+    return record;
   }
 
-  const record = (await response.json()) as SignatureRecord;
-  signatureCache.set(id, record);
-  return record;
+  throw new SignatureUnavailable(id);
 }
 
 /**

@@ -77,7 +77,7 @@ fn funded_policy() -> Contract {
         "swarm-1".to_string(),
         SwarmFingerprint {
             model_id: MODEL.to_string(),
-            prompt_hash: [9u8; 32],
+            prompt_hash: "09".repeat(32),
             agent_ids: (1..=20).map(|i| format!("agent-{i:02}")).collect(),
         },
     );

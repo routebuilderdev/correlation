@@ -40,7 +40,9 @@ function publicRun(run: Run) {
     error: run.error,
     evaluateTx: run.evaluateTx,
     txHashes: run.txHashes,
-    results: run.results.map((r) => ({
+    results: run.results
+      .filter((r): r is AgentResult => Boolean(r))
+      .map((r) => ({
       index: r.index,
       agentId: r.agentId,
       n: r.n,
@@ -107,6 +109,11 @@ export function buildServer(deps: Deps): FastifyInstance {
             windowStartNs: BigInt(Date.now()) * 1_000_000n,
             seed: policyId,
             poison: mode === "poisoned",
+            // Publish each cell the moment it settles: a judge watching the
+            // page should see twenty results arrive, not one jump at the end.
+            onAgent: (result) => {
+              run.results[result.index] = result;
+            },
           });
           run.status = "complete";
 

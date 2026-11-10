@@ -19,6 +19,9 @@ target/
 spike/out/
 *.log
 
+# a parallel `cargo near new` scaffold, kept on disk but not part of this project
+/correlation/
+
 # editors / os
 .DS_Store
 .idea/

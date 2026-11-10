@@ -75,11 +75,13 @@ pub struct SignerRegistration {
 }
 
 /// What the swarm shares. Two swarms with the same fingerprint fail together.
+/// `prompt_hash` is 64 hex characters, like every other hash at this boundary:
+/// a JSON byte array would make the call unreadable to the buyer.
 #[near(serializers = [json, borsh])]
 #[derive(Clone, Debug)]
 pub struct SwarmFingerprint {
     pub model_id: String,
-    pub prompt_hash: [u8; 32],
+    pub prompt_hash: String,
     pub agent_ids: Vec<AgentId>,
 }
 
