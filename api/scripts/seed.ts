@@ -16,7 +16,7 @@ import { join } from "node:path";
 
 import { sha256Hex } from "@correlation/shared";
 
-const RPC = process.env.NEAR_RPC_URL ?? "https://rpc.testnet.near.org";
+const RPC = process.env.NEAR_RPC_URL ?? "https://rpc.testnet.fastnear.com";
 const CONTRACT_ID = process.env.CONTRACT_ID ?? "correlation.testnet";
 const LP_ACCOUNT = process.env.LP_ACCOUNT ?? "correlation-lp.testnet";
 const BUYER_ACCOUNT = process.env.BUYER_ACCOUNT ?? "correlation-buyer.testnet";
@@ -106,14 +106,26 @@ async function call(
   args: Record<string, unknown>,
   options: { deposit?: bigint; gas?: bigint } = {},
 ): Promise<string> {
-  const result = (await as.callFunction({
-    contractId: CONTRACT_ID,
-    methodName: method,
-    args,
-    gas: options.gas ?? 100n * TGAS,
-    deposit: options.deposit ?? 0n,
-  })) as { transaction_outcome?: { id?: string } };
-  return result.transaction_outcome?.id ?? "submitted";
+  // A public RPC occasionally hands back a block hash that is already behind
+  // the head and rejects the signed transaction as expired. That transaction
+  // never landed, so signing it again cannot double-apply the deposit; any
+  // other failure is real and is raised on the first attempt.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const result = (await as.callFunction({
+        contractId: CONTRACT_ID,
+        methodName: method,
+        args,
+        gas: options.gas ?? 100n * TGAS,
+        deposit: options.deposit ?? 0n,
+      })) as { transaction_outcome?: { id?: string } };
+      return result.transaction_outcome?.id ?? "submitted";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt >= 3 || !/expired/i.test(message)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt));
+    }
+  }
 }
 
 async function main(): Promise<void> {

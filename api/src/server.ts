@@ -27,6 +27,8 @@ export interface Deps {
   evaluate: (policyId: number) => Promise<string>;
   claim: (policyId: number) => Promise<string>;
   policyView: (policyId: number) => Promise<unknown>;
+  /** The policy a request means when it names none. Optional for tests. */
+  latestPolicyId?: () => Promise<number>;
 }
 
 const runs = new Map<string, Run>();
@@ -73,13 +75,39 @@ export function buildServer(deps: Deps): FastifyInstance {
     if (request.method === "OPTIONS") return reply.status(204).send();
   });
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    model: config.model,
-    network: config.networkId,
-    contract: config.contractId,
-    signerConfigured: Boolean(config.signerAccountId && config.signerPrivateKey),
-  }));
+  /** A caller that names no policy gets the newest one on the contract. */
+  const resolvePolicyId = async (requested?: number): Promise<number> => {
+    if (requested !== undefined && Number.isInteger(requested) && requested > 0) return requested;
+    if (deps.latestPolicyId) {
+      try {
+        return await deps.latestPolicyId();
+      } catch {
+        // Fall through to 1: a chain hiccup must not stop the page loading.
+      }
+    }
+    return 1;
+  };
+
+  app.get("/api/health", async () => {
+    let policyId: number | null = null;
+    let policyError: string | null = null;
+    try {
+      policyId = deps.latestPolicyId ? await deps.latestPolicyId() : null;
+    } catch (error) {
+      // Health is the page's first call: say why the policy is unknown instead
+      // of hiding a broken RPC behind a spinner.
+      policyError = error instanceof Error ? error.message : String(error);
+    }
+    return {
+      ok: true,
+      model: config.model,
+      network: config.networkId,
+      contract: config.contractId,
+      signerConfigured: Boolean(config.signerAccountId && config.signerPrivateKey),
+      policyId,
+      policyError,
+    };
+  });
 
   app.post<{ Body: { mode?: "control" | "poisoned"; policyId?: number } }>(
     "/api/runs",
@@ -88,7 +116,7 @@ export function buildServer(deps: Deps): FastifyInstance {
       if (mode !== "control" && mode !== "poisoned") {
         return reply.status(400).send({ error: "mode must be control or poisoned" });
       }
-      const policyId = Number(request.body?.policyId ?? 1);
+      const policyId = await resolvePolicyId(request.body?.policyId);
       const run: Run = {
         id: `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
         policyId,
@@ -154,7 +182,7 @@ export function buildServer(deps: Deps): FastifyInstance {
 
   /** The final step a judge clicks: triggered -> paid. */
   app.post<{ Body: { policyId?: number } }>("/api/claim", async (request, reply) => {
-    const policyId = Number(request.body?.policyId ?? 1);
+    const policyId = await resolvePolicyId(request.body?.policyId);
     try {
       return { txHash: await deps.claim(policyId) };
     } catch (error) {
@@ -235,6 +263,7 @@ async function main(): Promise<void> {
     evaluate: chain.evaluate,
     claim: chain.claim,
     policyView: chain.policyView,
+    latestPolicyId: chain.latestPolicyId,
   });
 
   await app.listen({ port: config.port, host: "127.0.0.1" });

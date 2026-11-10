@@ -19,7 +19,7 @@ import { KeyPairSigner } from "@near-js/signers";
 import { actionCreators } from "@near-js/transactions";
 
 const ROOT = join(import.meta.dirname, "..", "..");
-const RPC = process.env.NEAR_RPC_URL ?? "https://rpc.testnet.near.org";
+const RPC = process.env.NEAR_RPC_URL ?? "https://rpc.testnet.fastnear.com";
 const FAUCET = "https://helper.testnet.near.org/account";
 const WASM = join(ROOT, "contract", "target", "wasm32-unknown-unknown", "release", "correlation.wasm");
 

@@ -126,6 +126,48 @@ export async function expire(policyId: number): Promise<string> {
   return withRetry(() => functionCall("expire", { policy_id: policyId }));
 }
 
+/**
+ * The newest policy on the contract.
+ *
+ * A policy id cannot be hardcoded: every demo buys a new policy, and a page
+ * pinned to an old one showed `Expired` while the run it was driving posted
+ * receipts against a different policy. Ids are sequential from 1, so scan up
+ * until `get_policy` stops answering. Cached briefly: the UI polls health.
+ */
+let latest: { id: number; at: number } | null = null;
+
+/** Eight at a time: one round trip each (~3s), and a demo has a handful. */
+const PROBE_WINDOW = 8;
+const MAX_POLICY_ID = 64;
+
+export async function latestPolicyId(): Promise<number> {
+  if (latest && Date.now() - latest.at < 15_000) return latest.id;
+  const { JsonRpcProvider } = await import("@near-js/providers");
+  const provider = new JsonRpcProvider({ url: config.rpcUrl });
+
+  let found = 0;
+  for (let base = 1; base <= MAX_POLICY_ID; base += PROBE_WINDOW) {
+    const ids = Array.from({ length: PROBE_WINDOW }, (_, offset) => base + offset);
+    // A retired id answers `null`, not an error, so `null` is the end marker.
+    const views = await Promise.all(
+      ids.map((id) =>
+        provider
+          .callFunction(config.contractId, "get_policy", { policy_id: id })
+          .then((view) => (view ? id : null))
+          .catch(() => null),
+      ),
+    );
+    const lastPresent = views.reduce<number>((acc, id) => (id !== null ? id : acc), 0);
+    if (lastPresent === 0) break;
+    found = lastPresent;
+    if (views.includes(null)) break;
+  }
+
+  if (found === 0) throw new Error(`no policies exist on ${config.contractId}`);
+  latest = { id: found, at: Date.now() };
+  return found;
+}
+
 /** One round trip for the UI: policy terms and pool state move together. */
 export async function policyView(policyId: number): Promise<unknown> {
   const { JsonRpcProvider } = await import("@near-js/providers");

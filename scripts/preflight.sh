@@ -67,7 +67,7 @@ fi
 
 echo
 echo "network"
-RPC="${NEAR_RPC_URL:-https://rpc.testnet.near.org}"
+RPC="${NEAR_RPC_URL:-https://rpc.testnet.fastnear.com}"
 if curl -fsS --max-time 10 -X POST "$RPC" -H 'content-type: application/json' \
      -d '{"jsonrpc":"2.0","id":"p","method":"status","params":[]}' >/dev/null; then
   ok "rpc reachable ($RPC)"
@@ -114,7 +114,9 @@ PY
 
 check_account "${CONTRACT_ID:-correlation.testnet}" 0 "run ./scripts/deploy.sh to create and deploy it"
 check_account "${EVAL_ACCOUNT:-correlation-eval.testnet}" 1000000000000000000000000 "run ./scripts/register-signer.sh"
-check_account "${BUYER_ACCOUNT:-correlation-buyer.testnet}" 10000000000000000000000000 "fund it from the testnet faucet"
+# The buyer only pays a 0.1 NEAR premium plus gas per policy; the capital that
+# backs a payout belongs to the LP account, so 1 NEAR is the real floor here.
+check_account "${BUYER_ACCOUNT:-correlation-buyer.testnet}" 1000000000000000000000000 "send testnet NEAR to the buyer account"
 
 # Is the contract actually deployed, and does it answer?
 if [[ -n "${CONTRACT_ID:-}" ]]; then

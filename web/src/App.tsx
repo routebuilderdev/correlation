@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   claimPayout,
+  fetchHealth,
   fetchPolicy,
   fetchRun,
   startRun,
@@ -11,7 +12,18 @@ import {
 } from "./api.ts";
 import { bpsToPercent, formatNear, shortAccount, shortHash } from "./format.ts";
 
-const POLICY_ID = 1;
+/**
+ * Which policy the page drives.
+ *
+ * `?policy=N` wins, otherwise the newest policy the contract holds: a demo buys
+ * a new policy each time, and a hardcoded id filmed a dead one while the run
+ * wrote to a live one.
+ */
+function requestedPolicy(): number | null {
+  const raw = new URLSearchParams(window.location.search).get("policy");
+  const parsed = raw === null ? NaN : Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -115,6 +127,7 @@ function ReceiptTable({ results }: { results: AgentRow[] }) {
 }
 
 export default function App() {
+  const [policyId, setPolicyId] = useState<number | null>(requestedPolicy());
   const [policy, setPolicy] = useState<PolicyResponse | null>(null);
   const [run, setRun] = useState<RunResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -123,12 +136,27 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const loadPolicy = useCallback(async () => {
+    if (policyId === null) return;
     try {
-      setPolicy(await fetchPolicy(POLICY_ID));
+      setPolicy(await fetchPolicy(policyId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
-  }, []);
+  }, [policyId]);
+
+  // The contract names the policy, not the browser: ask once, then poll views.
+  useEffect(() => {
+    if (policyId !== null) return;
+    void (async () => {
+      try {
+        const health = await fetchHealth();
+        setPolicyId(health.policyId ?? 1);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+        setPolicyId(1);
+      }
+    })();
+  }, [policyId]);
 
   useEffect(() => {
     void loadPolicy();
@@ -149,10 +177,11 @@ export default function App() {
   }, [run]);
 
   const launch = async (mode: "control" | "poisoned") => {
+    if (policyId === null) return;
     setBusy(true);
     setError(null);
     try {
-      const runId = await startRun(mode, POLICY_ID);
+      const runId = await startRun(mode, policyId);
       setRun(await fetchRun(runId));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -162,10 +191,11 @@ export default function App() {
   };
 
   const pay = async () => {
+    if (policyId === null) return;
     setClaiming(true);
     setError(null);
     try {
-      setClaimTx(await claimPayout(POLICY_ID));
+      setClaimTx(await claimPayout(policyId));
       await loadPolicy();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -178,6 +208,9 @@ export default function App() {
   const pool = policy?.pool;
   const status = run?.status ?? view?.status?.toLowerCase() ?? "idle";
   const running = status === "running" || status === "evaluating";
+  // Receipts only count inside an open window: a run against a spent policy
+  // posts twenty transactions and cannot trigger.
+  const open = view === undefined || view.status === "Active";
 
   return (
     <main>
@@ -188,10 +221,10 @@ export default function App() {
         </div>
         <div className="controls">
           <span className="badge">● testnet</span>
-          <button disabled={busy || running} onClick={() => void launch("control")}>
+          <button disabled={busy || running || !open} onClick={() => void launch("control")}>
             Run control
           </button>
-          <button disabled={busy || running} onClick={() => void launch("poisoned")}>
+          <button disabled={busy || running || !open} onClick={() => void launch("poisoned")}>
             Run poisoned
           </button>
           {view?.status === "Triggered" ? (
@@ -203,9 +236,15 @@ export default function App() {
       </header>
 
       {error ? <p className="alert">{error}</p> : null}
+      {view && !open ? (
+        <p className="alert">
+          p-{String(policyId).padStart(3, "0")} is {view.status.toLowerCase()} — this window is
+          closed. Buy a new policy with <code>npm run seed --workspace @correlation/api</code>.
+        </p>
+      ) : null}
 
       <div className="columns">
-        <Panel title={`Policy p-${String(POLICY_ID).padStart(3, "0")} · ${status}`}>
+        <Panel title={`Policy p-${String(policyId ?? 0).padStart(3, "0")} · ${status}`}>
           {view ? (
             <>
               <Row label="limit" value={`${formatNear(view.limit)} NEAR`} />

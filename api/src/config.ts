@@ -10,7 +10,7 @@ export const config = {
   nearaiApiKey: process.env.NEARAI_API_KEY ?? "",
   model: process.env.NEARAI_MODEL ?? "z-ai/glm-5.3-flash",
   networkId: process.env.NEAR_NETWORK ?? "testnet",
-  rpcUrl: process.env.NEAR_RPC_URL ?? "https://rpc.testnet.near.org",
+  rpcUrl: process.env.NEAR_RPC_URL ?? "https://rpc.testnet.fastnear.com",
   contractId: process.env.CONTRACT_ID ?? "correlation.testnet",
   // The evaluator posts receipts and calls evaluate; the buyer only claims.
   signerAccountId: process.env.EVAL_ACCOUNT ?? "",

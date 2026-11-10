@@ -62,10 +62,24 @@ export interface RunResponse {
   results: AgentRow[];
 }
 
+export interface HealthResponse {
+  ok: boolean;
+  model: string;
+  network: string;
+  contract: string;
+  signerConfigured: boolean;
+  /** newest policy on the contract, or null when the chain could not be read */
+  policyId: number | null;
+}
+
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url} ${response.status}`);
   return (await response.json()) as T;
+}
+
+export function fetchHealth(): Promise<HealthResponse> {
+  return getJson<HealthResponse>("/api/health");
 }
 
 export function fetchPolicy(policyId: number): Promise<PolicyResponse> {

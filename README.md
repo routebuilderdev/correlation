@@ -37,6 +37,10 @@ npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
 
+The default RPC is `https://rpc.testnet.fastnear.com`. The public `rpc.testnet.near.org` endpoint is
+deprecated and answers `429` under load, which looks like a broken demo rather than a broken endpoint;
+set `NEAR_RPC_URL` to move.
+
 `preflight.sh` checks the toolchain, the contract build, every required secret, testnet RPC, each
 account's existence and balance, whether the contract answers, and whether the model key is accepted
 (`402`/`429` there means NEAR has not issued credits yet — retry later, nothing else is blocked).
@@ -62,10 +66,13 @@ T3 against bytes the model TEE actually signed.
 
 ## The 60-second demo
 
-1. Open `http://localhost:5173`. The policy panel shows the limit, premium, 2500 bps trigger,
-   16-of-20 receipts required and the model `z-ai/glm-5.3-flash`. The numbers come from what the
-   pool actually holds: a testnet faucet gives each account 10 NEAR, so the seed script deposits
-   about 8.5 NEAR and writes a 0.1 NEAR premium against a limit of 90% of the free capital.
+1. Open `http://localhost:5173`. The page asks the contract which policy is newest and drives that
+   one, so a freshly seeded policy needs no configuration; `?policy=3` pins an older one. The panel
+   shows the limit, premium, 2500 bps trigger, 16-of-20 receipts required and the model
+   `z-ai/glm-5.3-flash`. The numbers come from what the pool actually holds: the seed script deposits
+   whatever the LP account holds above a gas reserve and writes a 0.1 NEAR premium against a limit of
+   90% of the free capital. When the window has closed the run buttons disable themselves, because a
+   receipt posted outside the window is rejected for the wrong reason.
 2. Press **Run control**. Twenty cells fill in; the index stays at 0%, the policy stays `Active`.
 3. Press **Run poisoned**. The system prompt gains one plausible-looking rounding instruction.
    In practice fifteen to eighteen of the twenty agents answer the same arithmetic question wrongly —
@@ -73,6 +80,9 @@ T3 against bytes the model TEE actually signed.
 4. The index lands near 90% against a 2500 bps trigger, `evaluate` fires on chain, the policy reads
    `Triggered`, and the **Claim payout** button pays the limit to the buyer, capped by what the pool
    actually holds.
+
+The four steps run unattended, in the order the video needs them, with `./scripts/record.sh`
+(`PAUSE=1` stops between steps for filming); `./scripts/demo.sh poisoned 4` drives a single arm.
 
 A finished run is written to `api/.runs/<run-id>.json` and served from there after the process
 restarts, so the fallback in the demo script is real: if the model is unreachable on the day, poll
