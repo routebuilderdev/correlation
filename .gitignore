@@ -27,3 +27,6 @@ spike/out/
 .DS_Store
 .idea/
 .vscode/
+
+# recorded demo footage and captures
+/film/

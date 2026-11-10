@@ -12,11 +12,16 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const RUNS_DIR = join(HERE, "..", ".runs");
+
+/** Read per call so the tests can point it at a temporary directory. */
+function runsDir(): string {
+  return process.env.RUNS_DIR ?? join(HERE, "..", ".runs");
+}
 
 export async function saveRun(id: string, run: unknown): Promise<void> {
-  await mkdir(RUNS_DIR, { recursive: true });
-  await writeFile(join(RUNS_DIR, `${id}.json`), JSON.stringify(run, null, 2), "utf8");
+  const dir = runsDir();
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, `${id}.json`), JSON.stringify(run, null, 2), "utf8");
 }
 
 export async function loadRun<T>(id: string): Promise<T | null> {
@@ -24,7 +29,7 @@ export async function loadRun<T>(id: string): Promise<T | null> {
   // before it is joined: `../..` is a read of an arbitrary file.
   if (!/^run-[a-z0-9-]{1,64}$/.test(id)) return null;
   try {
-    return JSON.parse(await readFile(join(RUNS_DIR, `${id}.json`), "utf8")) as T;
+    return JSON.parse(await readFile(join(runsDir(), `${id}.json`), "utf8")) as T;
   } catch {
     return null;
   }

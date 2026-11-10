@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import type { AgentResult } from "../src/swarm/agents.ts";
 
 process.env.NEARAI_API_KEY ??= "test-key";
+// A run is written to disk when it finishes, tests included. Without this, every
+// `npm test` left fake runs next to the real ones, and ?run=<id> could render one.
+process.env.RUNS_DIR = mkdtempSync(join(tmpdir(), "correlation-runs-"));
 const { buildServer } = await import("../src/server.ts");
 
 function result(index: number, ok: boolean): AgentResult {
