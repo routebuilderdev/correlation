@@ -41,7 +41,7 @@ export const config = {
 export function requireApiKey(): string {
   if (!config.nearaiApiKey) {
     throw new Error(
-      "NEARAI_API_KEY is not set. Put it in spike/.env (never in git) or export it before starting the server.",
+      "NEARAI_API_KEY is not set. Put it in .env at the repository root (never in git) or export it before starting the server.",
     );
   }
   return config.nearaiApiKey;
