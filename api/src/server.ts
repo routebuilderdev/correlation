@@ -6,6 +6,7 @@ import { sha256Hex } from "@correlation/shared";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { config } from "./config.ts";
+import { loadRun, saveRun } from "./store.ts";
 import { runSwarm, type AgentResult, type SwarmOptions } from "./swarm/agents.ts";
 
 export interface Run {
@@ -141,6 +142,9 @@ export function buildServer(deps: Deps): FastifyInstance {
         } catch (error) {
           run.error = error instanceof Error ? error.message : String(error);
           run.status = "error";
+        } finally {
+          // Survives the process: a recorded run is the demo-day fallback.
+          await saveRun(run.id, publicRun(run));
         }
       })();
 
@@ -193,8 +197,10 @@ export function buildServer(deps: Deps): FastifyInstance {
 
   app.get<{ Params: { id: string } }>("/api/runs/:id", async (request, reply) => {
     const run = runs.get(request.params.id);
-    if (!run) return reply.status(404).send({ error: "unknown run" });
-    return publicRun(run);
+    if (run) return publicRun(run);
+    const recorded = await loadRun<unknown>(request.params.id);
+    if (!recorded) return reply.status(404).send({ error: "unknown run" });
+    return recorded;
   });
 
   app.get<{ Params: { id: string } }>("/api/policy/:id", async (request, reply) => {

@@ -68,9 +68,15 @@ T3 against bytes the model TEE actually signed.
    about 8.5 NEAR and writes a 0.1 NEAR premium against a limit of 90% of the free capital.
 2. Press **Run control**. Twenty cells fill in; the index stays at 0%, the policy stays `Active`.
 3. Press **Run poisoned**. The system prompt gains one plausible-looking rounding instruction.
-   Roughly a third of the agents now answer the same arithmetic question wrongly.
-4. The index crosses 25%, `evaluate` fires on chain, the policy reads `Triggered`, and the
-   **Claim payout** button pays the limit to the buyer, capped by what the pool actually holds.
+   In practice fifteen to eighteen of the twenty agents answer the same arithmetic question wrongly —
+   the same wrong value, because the shared context does the damage, not twenty independent mistakes.
+4. The index lands near 90% against a 2500 bps trigger, `evaluate` fires on chain, the policy reads
+   `Triggered`, and the **Claim payout** button pays the limit to the buyer, capped by what the pool
+   actually holds.
+
+A finished run is written to `api/.runs/<run-id>.json` and served from there after the process
+restarts, so the fallback in the demo script is real: if the model is unreachable on the day, poll
+the recorded run id and the same UI renders the same twenty cells, bytes and signatures.
 
 Both runs are the *same* model, the *same* prompt shape and the *same* task family. The only
 difference is one sentence of context.
@@ -141,7 +147,7 @@ same recovery (`shared/` is a mirror of `contract/src/verify.rs`).
 
 | Role | Account | Purpose |
 |---|---|---|
-| contract | `correlation.testnet` | policies, pool, index, payouts |
+| contract | [`correlation.testnet`](https://testnet.nearblocks.io/address/correlation.testnet) | policies, pool, index, payouts |
 | lp | `correlation-lp.testnet` | deposits capital |
 | buyer | `correlation-buyer.testnet` | buys cover, claims |
 | eval | `correlation-eval.testnet` | posts receipts, calls `evaluate` |

@@ -1,5 +1,6 @@
 # dependencies
 node_modules/
+api/.runs/
 .pnpm-store/
 
 # build output
