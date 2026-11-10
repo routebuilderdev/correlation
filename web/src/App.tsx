@@ -25,6 +25,12 @@ function requestedPolicy(): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+/** `?run=run-…` renders a finished run from api/.runs without driving the model. */
+function requestedRun(): string | null {
+  const raw = new URLSearchParams(window.location.search).get("run");
+  return raw && /^run-[a-z0-9-]{1,64}$/.test(raw) ? raw : null;
+}
+
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="panel">
@@ -163,6 +169,19 @@ export default function App() {
     const timer = setInterval(() => void loadPolicy(), 3000);
     return () => clearInterval(timer);
   }, [loadPolicy]);
+
+  // Demo-day fallback: a recorded run renders exactly as it did live.
+  useEffect(() => {
+    const id = requestedRun();
+    if (!id) return;
+    void (async () => {
+      try {
+        setRun(await fetchRun(id));
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!run || run.status === "triggered" || run.status === "error") return;
