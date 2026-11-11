@@ -39,12 +39,18 @@ written on chain.
 ## Quick start
 
 ```bash
+npm install                                   # shared, api, web
+cp .env.example .env                          # then add NEARAI_API_KEY (never committed)
+npm test                                      # 32 TypeScript tests (shared + api)
+
 ./scripts/preflight.sh                        # says exactly what is missing, and how to fix it
 ./scripts/go.sh                               # preflight, then serve api + ui
+```
 
-npm install                                   # shared, api, web
-cp .env.example .env                          # add NEARAI_API_KEY (never committed)
-npm test                                      # 32 TypeScript tests (shared + api)
+`preflight.sh` reads `node_modules`, so it belongs after `npm install`. To run the two processes
+separately instead of via `go.sh`:
+
+```bash
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
@@ -124,7 +130,7 @@ the demo script:
 ```
   orchestrator (api/)                      NEAR AI Cloud                  NEAR testnet
  ┌──────────────────────┐   exact bytes   ┌──────────────┐   signature  ┌──────────────────┐
- │ 20 agents, 4 at once │ ──────────────► │  glm-5.3     │ ───────────► │ post_receipt      │
+ │ 20 agents, 2 at once │ ──────────────► │  glm-5.3     │ ───────────► │ post_receipt      │
  │ one task each        │                 │  provider TEE│              │  re-hash bytes    │
  │ keeps req/res bytes  │ ◄────────────── └──────────────┘              │  recover signer   │
  └──────────┬───────────┘                                               │  re-derive n      │
@@ -229,3 +235,7 @@ signs `<req>:<resp>` with no model prefix. `NEARAI_BASE_URL` therefore defaults 
 
 Prototype built for a hackathon. Not insurance, not a financial product, no real funds, testnet
 only. Nothing here has been audited.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
