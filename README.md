@@ -9,9 +9,12 @@ The point is not that an agent failed. It is that *the swarm* failed together, a
 provable without trusting an oracle: the contract re-derives the expected task input, rebuilds the
 signed text from the raw request and response bytes, and recovers the signer key on chain.
 
+![Eighteen of twenty agent cells turn red, the index crosses the trigger, and the claim pays 7.8284 NEAR](assets/demo.gif)
+
 ## Demo
 
-Sixty seconds of the app paying out: [the demo post](https://x.com/routebuilderdev/status/2120637879496151410).
+The loop above is ten seconds of the poisoned arm. The full sixty seconds, captioned and
+[posted on X](https://x.com/routebuilderdev/status/2120637879496151410), shows both arms and the payout.
 
 ## Proven on testnet
 
