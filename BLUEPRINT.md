@@ -886,7 +886,7 @@ NEAR_hackathon_2026/
 ├── AGENTS.md                               ✅ parent dir
 ├── BLUEPRINT.md                            ← this file
 ├── README.md                               ← §14
-├── LICENSE                                 ← MIT
+├── LICENSE                                 ← AGPL-3.0
 ├── .env.example                            ← §10.2
 ├── package.json                            ← workspace root
 ├── pnpm-workspace.yaml

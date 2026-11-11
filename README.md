@@ -238,4 +238,7 @@ only. Nothing here has been audited.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+AGPL-3.0-only — see [`LICENSE`](LICENSE). Copyright (C) 2026 Correlation contributors.
+
+You may use, modify and self-host this software. If you run a modified version as a network
+service, you must offer its source under the same license.

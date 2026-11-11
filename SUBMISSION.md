@@ -71,7 +71,7 @@ node -e 'console.log(crypto.randomUUID())'
 - [ ] The abandoned `correlation/` scaffold stays untracked (`/correlation/` in `.gitignore`).
 - [ ] No secrets in history: only `.env.example` is tracked.
 - [ ] `README.md` renders the run that actually happened, with the contract address.
-- [ ] `LICENSE` present (MIT).
+- [ ] `LICENSE` present (AGPL-3.0).
 - [ ] Repository public before 2026-11-14T23:59:00Z.
 - [ ] Demo post live with video attached, before submitting, so `demoUrl` is real.
 - [ ] Payload under 12,000 bytes, no `website` field.
