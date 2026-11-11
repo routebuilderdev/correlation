@@ -137,11 +137,11 @@ the demo script:
 ```
   orchestrator (api/)                      NEAR AI Cloud                  NEAR testnet
  ┌──────────────────────┐   exact bytes   ┌──────────────┐   signature  ┌──────────────────┐
- │ 20 agents, 2 at once │ ──────────────► │  glm-5.3     │ ───────────► │ post_receipt      │
- │ one task each        │                 │  provider TEE│              │  re-hash bytes    │
- │ keeps req/res bytes  │ ◄────────────── └──────────────┘              │  recover signer   │
- └──────────┬───────────┘                                               │  re-derive n      │
-            │  request_bytes, response_bytes, signature_json            │  index = f/s      │
+ │ 20 agents, 2 at once │ ──────────────► │  glm-5.3     │ ───────────► │ post_receipt     │
+ │ one task each        │                 │  provider TEE│              │  re-hash bytes   │
+ │ keeps req/res bytes  │ ◄────────────── └──────────────┘              │  recover signer  │
+ └──────────┬───────────┘                                               │  re-derive n     │
+            │  request_bytes, response_bytes, signature_json            │  index = f/s     │
             └─────────────────────────────────────────────────────────► │ trigger → claim  │
                                                                         └──────────────────┘
 ```
