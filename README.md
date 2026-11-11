@@ -16,6 +16,37 @@ signed text from the raw request and response bytes, and recovers the signer key
 The loop above is ten seconds of the poisoned arm. The full sixty seconds, captioned and
 [posted on X](https://x.com/routebuilderdev/status/2120637879496151410), shows both arms and the payout.
 
+## Verify it yourself
+
+Three checks, none of which depend on this repository's scripts or on taking the README's word for
+anything.
+
+**1. Read the paying policy off the chain.** Policy 20 on `correlation.testnet` is the one the demo
+paid against:
+
+```bash
+curl -s -X POST https://rpc.testnet.fastnear.com \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"call_function","finality":"final","account_id":"correlation.testnet","method_name":"get_policy","args_base64":"eyJwb2xpY3lfaWQiOjIwfQ=="}}' \
+  | python3 -c 'import sys,json; d=json.loads(bytes(json.load(sys.stdin)["result"]["result"]).decode()); print(json.dumps({k:d[k] for k in ("policy_id","status","failed","started","trigger_bps","paid_amount")}))'
+```
+
+It answers:
+
+```json
+{"policy_id": 20, "status": "Paid", "failed": 18, "started": 20, "trigger_bps": 2500, "paid_amount": "7828400000000000000000000"}
+```
+
+`paid_amount` is yoctoNEAR, so that is 7.8284 NEAR. Policy 19, the control arm, reads `Active` with
+`failed: 1` — the same fleet, the same day, one sentence of context different.
+
+**2. Open the payout transaction.**
+[`861Ege…kjXf7t`](https://testnet.nearblocks.io/txns/861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t) is
+the `claim` call the contract executed, not a transfer made by a server that decided to pay.
+
+**3. Run the tests.** `npm test` covers canonicalisation and the API (32 tests); `cd contract &&
+cargo test` covers the Rust contract (42), including a full twenty-receipt run.
+
 ## Proven on testnet
 
 This is not a plan: policy #3 on `correlation.testnet` ran the whole path with live traffic.
