@@ -4,6 +4,7 @@ import {
   claimPayout,
   fetchHealth,
   fetchPolicy,
+  fetchLatestRun,
   fetchRun,
   startRun,
   type AgentRow,
@@ -123,7 +124,21 @@ function ReceiptTable({ results }: { results: AgentRow[] }) {
             <td>{row.answer ?? "—"}</td>
             <td title={row.requestSha256 ?? ""}>{shortHash(row.requestSha256)}</td>
             <td title={row.responseSha256 ?? ""}>{shortHash(row.responseSha256)}</td>
-            <td title={row.signingPublicKey ?? ""}>{row.signatureKind ?? "—"}</td>
+            {/* The direct model endpoint returns only text/signature/address:
+                no signature_kind, so the kind alone would leave every row
+                blank. The recovered signer is the value we actually hold. */}
+            <td
+              title={
+                row.signatureKind
+                  ? `signed by ${row.signatureKind}`
+                  : row.signingAddress
+                    ? `recovered signer ${row.signingAddress}`
+                    : "no signature metadata returned"
+              }
+            >
+              {row.signatureKind ??
+                (row.signingAddress ? shortHash(row.signingAddress, 6) : "not available")}
+            </td>
             <td title={row.txHash ?? ""}>{row.txHash ? shortHash(row.txHash, 5) : "—"}</td>
           </tr>
         ))}
@@ -140,6 +155,9 @@ export default function App() {
   const [claiming, setClaiming] = useState(false);
   const [claimTx, setClaimTx] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A policy is Active the moment it is bought, but its receipt window opens a
+  // minute later: the contract rejects anything posted before that with E03.
+  const [now, setNow] = useState(() => Date.now());
 
   const loadPolicy = useCallback(async () => {
     if (policyId === null) return;
@@ -170,6 +188,24 @@ export default function App() {
     return () => clearInterval(timer);
   }, [loadPolicy]);
 
+  // A reload used to leave twenty empty cells next to a chain that says all
+  // twenty receipts landed, because the page only knew runs it had started.
+  useEffect(() => {
+    if (policyId === null || requestedRun()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const recorded = await fetchLatestRun(policyId);
+        if (!cancelled) setRun(recorded);
+      } catch {
+        /* no run for this policy yet: an empty grid is the truth */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [policyId]);
+
   // Demo-day fallback: a recorded run renders exactly as it did live.
   useEffect(() => {
     const id = requestedRun();
@@ -184,7 +220,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!run || run.status === "triggered" || run.status === "error") return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!run || run.status === "triggered" || run.status === "complete" || run.status === "error") return;
     const timer = setInterval(async () => {
       try {
         setRun(await fetchRun(run.id));
@@ -225,11 +266,17 @@ export default function App() {
 
   const view = policy?.policy;
   const pool = policy?.pool;
-  const status = run?.status ?? view?.status?.toLowerCase() ?? "idle";
-  const running = status === "running" || status === "evaluating";
+  const running = run?.status === "running" || run?.status === "evaluating";
+  // While a run is going, the panel names the run. Afterwards it names the
+  // contract: the API's last thought about a finished run is not the truth, and
+  // "complete" next to a live policy read as a contradiction on film.
+  const status = running ? run!.status : view?.status?.toLowerCase() ?? run?.status ?? "idle";
   // Receipts only count inside an open window: a run against a spent policy
-  // posts twenty transactions and cannot trigger.
+  // posts twenty transactions and cannot trigger. A fresh policy's window opens
+  // 60s after it is bought, so the clock gates the buttons too.
   const open = view === undefined || view.status === "Active";
+  const windowIn = view && open ? Math.ceil((view.window_start_ns / 1e6 - now) / 1000) : 0;
+  const canRun = open && windowIn <= 0;
 
   return (
     <main>
@@ -240,10 +287,10 @@ export default function App() {
         </div>
         <div className="controls">
           <span className="badge">● testnet</span>
-          <button disabled={busy || running || !open} onClick={() => void launch("control")}>
+          <button disabled={busy || running || !canRun} onClick={() => void launch("control")}>
             Run control
           </button>
-          <button disabled={busy || running || !open} onClick={() => void launch("poisoned")}>
+          <button disabled={busy || running || !canRun} onClick={() => void launch("poisoned")}>
             Run poisoned
           </button>
           {view?.status === "Triggered" ? (
@@ -255,10 +302,20 @@ export default function App() {
       </header>
 
       {error ? <p className="alert">{error}</p> : null}
+      {view && open && windowIn > 0 ? (
+        <p className="alert muted-alert">
+          receipt window opens in {windowIn}s — anything posted before it is rejected
+        </p>
+      ) : null}
       {view && !open ? (
-        <p className="alert">
-          p-{String(policyId).padStart(3, "0")} is {view.status.toLowerCase()} — this window is
-          closed. Buy a new policy with <code>npm run seed --workspace @correlation/api</code>.
+        <p
+          className={`alert${view.status === "Triggered" || view.status === "Paid" ? " good" : ""}`}
+        >
+          {view.status === "Triggered"
+            ? `p-${String(policyId).padStart(3, "0")} triggered — the payout is claimable above.`
+            : view.status === "Paid"
+              ? `p-${String(policyId).padStart(3, "0")} paid — the pool has settled this policy.`
+              : `p-${String(policyId).padStart(3, "0")} closed without triggering — the window took receipts but stayed under the trigger, so it pays nothing.`}
         </p>
       ) : null}
 
@@ -302,6 +359,11 @@ export default function App() {
       </div>
 
       <Panel title={`Swarm (${run?.results.length ?? 0} / 20)`}>
+        {run ? (
+          <p className="muted run-status">
+            {run.mode} run · {run.status}
+          </p>
+        ) : null}
         <SwarmGrid results={run?.results ?? []} />
       </Panel>
 

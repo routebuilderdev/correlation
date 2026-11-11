@@ -86,6 +86,11 @@ export function fetchPolicy(policyId: number): Promise<PolicyResponse> {
   return getJson<PolicyResponse>(`/api/policy/${policyId}`);
 }
 
+/** The newest run recorded for a policy, so a reload does not lose the grid. */
+export function fetchLatestRun(policyId: number): Promise<RunResponse> {
+  return getJson<RunResponse>(`/api/policy/${policyId}/run`);
+}
+
 export function fetchRun(runId: string): Promise<RunResponse> {
   return getJson<RunResponse>(`/api/runs/${runId}`);
 }

@@ -113,6 +113,15 @@ async function runAgent(
         error instanceof SignatureUnavailable ||
         /aborted due to timeout|fetch failed|ECONN/i.test(message);
       if (!retryable) break;
+      // A signature lookup can land on a different instance than the one that
+      // served the completion (docs.near.ai: direct endpoints keep signatures in
+      // per-instance memory, cloud-api#1087), so an instant second ask tends to
+      // reach the same instance and miss again. Back off a little.
+      if (attempt < config.swarmAttempts) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 400 * attempt + Math.random() * 300),
+        );
+      }
     }
   }
 
@@ -147,5 +156,24 @@ export async function runSwarm(options: SwarmOptions): Promise<AgentResult[]> {
       worker(),
     ),
   );
+
+  // A cell with no signature is a hole the contract will not accept: it needs
+  // every agent (`trigger.rs`: `started >= min_agents`), so one unsigned agent
+  // makes the policy unpayable no matter how many failures the rest produced.
+  // Re-run just the missing agents as whole new completions — the only useful
+  // answer to a signature that never appears — twice at most.
+  for (let pass = 0; pass < 2; pass += 1) {
+    const missing = results.filter((result) => result && !result.signature);
+    if (!missing.length) break;
+    for (const previous of missing) {
+      results[previous.index] = await runAgent(
+        options.policyId,
+        previous.index,
+        options.poison,
+        model,
+      );
+      options.onAgent?.(results[previous.index]!);
+    }
+  }
   return results;
 }

@@ -52,7 +52,7 @@ test("a run goes running -> complete -> evaluating -> triggered", async () => {
     submitReceipt: async (r) => `tx-${r.agentId}`,
     evaluate: async () => "tx-evaluate",
     claim: async () => "tx-claim",
-    policyView: async () => ({ status: "Active" }),
+    policyView: async () => ({ policy: { status: "Triggered" } }),
   });
 
   const start = await app.inject({
@@ -90,7 +90,7 @@ test("a duplicate receipt is not reported as an agent failure", async () => {
     },
     evaluate: async () => "tx-evaluate",
     claim: async () => "tx-claim",
-    policyView: async () => ({}),
+    policyView: async () => ({ policy: { status: "Triggered" } }),
   });
 
   const start = await app.inject({ method: "POST", url: "/api/runs", payload: { mode: "control" } });
@@ -99,6 +99,89 @@ test("a duplicate receipt is not reported as an agent failure", async () => {
   await waitFor(async () => (await poll()).json(), "triggered");
 
   assert.equal((await poll()).json().results[0].error, null);
+  await app.close();
+});
+
+test("a receipt that lands on a retry leaves no error behind", async () => {
+  // Every contract rejection reaches the client as the same opaque wasm trap,
+  // and a send can fail after landing. So the run's final state is what counts:
+  // once a retry puts the receipt on chain, the earlier E-submit line is
+  // history. Leaving it there printed a red cell over a receipt that landed.
+  let attempts = 0;
+  const app = buildServer({
+    runSwarm: async (options) => {
+      const first = result(0, true);
+      options.onAgent?.(first);
+      return [first];
+    },
+    submitReceipt: async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("WebAssembly trap: An `unreachable` opcode was executed.");
+      }
+      return "tx-agent-01";
+    },
+    receiptPosted: async () => false,
+    evaluate: async () => "tx-evaluate",
+    claim: async () => "tx-claim",
+    policyView: async () => ({ policy: { status: "Triggered" } }),
+  });
+
+  const start = await app.inject({ method: "POST", url: "/api/runs", payload: { mode: "control" } });
+  const runId = start.json().runId as string;
+  const poll = () => app.inject({ method: "GET", url: `/api/runs/${runId}` });
+  await waitFor(async () => (await poll()).json(), "triggered");
+
+  const body = (await poll()).json();
+  assert.equal(attempts, 2);
+  assert.equal(body.results[0].error, null);
+  assert.equal(body.txHashes["agent-01"], "tx-agent-01");
+  await app.close();
+});
+
+test("an arm that stays below the trigger is complete, not triggered", async () => {
+  // evaluate() succeeds below the threshold as well: it records the index and
+  // returns. The label has to come from the contract, or the control arm showed
+  // "triggered" next to a 0% gauge.
+  const app = buildServer({
+    runSwarm: async () => [result(0, true), result(1, true)],
+    submitReceipt: async (r) => `tx-${r.agentId}`,
+    evaluate: async () => "tx-evaluate",
+    claim: async () => "tx-claim",
+    policyView: async () => ({ policy: { status: "Active" } }),
+  });
+
+  const start = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: { mode: "control", policyId: 7 },
+  });
+  const runId = start.json().runId as string;
+  const poll = () => app.inject({ method: "GET", url: `/api/runs/${runId}` });
+  await waitFor(async () => (await poll()).json(), "complete");
+
+  const body = (await poll()).json();
+  assert.equal(body.status, "complete");
+  assert.equal(body.evaluateTx, "tx-evaluate");
+  await app.close();
+});
+
+test("an unreadable policy view never reports a payout", async () => {
+  const app = buildServer({
+    runSwarm: async () => [result(0, false)],
+    submitReceipt: async () => "tx",
+    evaluate: async () => "tx-evaluate",
+    claim: async () => "tx-claim",
+    policyView: async () => {
+      throw new Error("rpc unreachable");
+    },
+  });
+
+  const start = await app.inject({ method: "POST", url: "/api/runs", payload: { mode: "poisoned" } });
+  const runId = start.json().runId as string;
+  const poll = () => app.inject({ method: "GET", url: `/api/runs/${runId}` });
+  await waitFor(async () => (await poll()).json(), "complete");
+  assert.equal((await poll()).json().status, "complete");
   await app.close();
 });
 
@@ -136,6 +219,43 @@ test("claim returns the payout transaction and surfaces a contract refusal", asy
   const refused = await app.inject({ method: "POST", url: "/api/claim", payload: { policyId: 2 } });
   assert.equal(refused.statusCode, 502);
   assert.match(refused.json().error, /E02/);
+  await app.close();
+});
+
+test("a reload is served the newest recorded run for its policy", async () => {
+  const { saveRun } = await import("../src/store.ts");
+  const recorded = (id: string, policyId: number, startedAt: string) => ({
+    id,
+    policyId,
+    mode: "control",
+    status: "complete",
+    startedAt,
+    error: null,
+    evaluateTx: null,
+    txHashes: {},
+    results: [],
+  });
+  await saveRun("run-older-1", recorded("run-older-1", 9, "2026-11-11T10:00:00.000Z"));
+  await saveRun("run-newer-2", recorded("run-newer-2", 9, "2026-11-11T12:00:00.000Z"));
+  await saveRun("run-other-3", recorded("run-other-3", 10, "2026-11-11T13:00:00.000Z"));
+
+  const app = buildServer({
+    runSwarm: async () => [],
+    submitReceipt: async () => "tx",
+    evaluate: async () => "tx",
+    claim: async () => "tx-claim",
+    policyView: async () => ({}),
+  });
+
+  const newest = await app.inject({ method: "GET", url: "/api/policy/9/run" });
+  assert.equal(newest.statusCode, 200);
+  assert.equal(newest.json().id, "run-newer-2");
+
+  const none = await app.inject({ method: "GET", url: "/api/policy/11/run" });
+  assert.equal(none.statusCode, 404);
+
+  const bad = await app.inject({ method: "GET", url: "/api/policy/zero/run" });
+  assert.equal(bad.statusCode, 400);
   await app.close();
 });
 

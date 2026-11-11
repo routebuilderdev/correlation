@@ -271,6 +271,27 @@ tr.bad td {
   font-size: 12px;
 }
 
+/* A triggered policy is the outcome the product exists for, so it must not wear
+   the same red as an error. */
+.alert.good {
+  border-color: #1f4d3d;
+  background: #0e1f19;
+  color: var(--accent);
+}
+
+.muted-alert {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.run-status {
+  margin: -4px 0 12px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 footer {
   margin-top: 24px;
   font-size: 11px;

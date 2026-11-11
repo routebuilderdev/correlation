@@ -24,6 +24,11 @@ This is not a plan: policy #3 on `correlation.testnet` ran the whole path with l
 Every number above comes from a signed receipt: the contract rejected nothing it could not verify, and
 the payout is the contract's arithmetic, not the orchestrator's claim.
 
+The video was filmed on a later pair, and the split is not identical run to run: P-017 control (20
+receipts, 1 failed, 500 bps, no payout) and P-018 poisoned (20 receipts, 19 failed, 9500 bps, 7.8284
+NEAR paid). Temperature 0 does not make a hosted reasoning model deterministic, so the arms are
+reported as measured, never as expected.
+
 ## Quick start
 
 ```bash
@@ -32,7 +37,7 @@ the payout is the contract's arithmetic, not the orchestrator's claim.
 
 npm install                                   # shared, api, web
 cp .env.example .env                          # add NEARAI_API_KEY (never committed)
-npm test                                      # 28 TypeScript tests (shared + api)
+npm test                                      # 32 TypeScript tests (shared + api)
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```

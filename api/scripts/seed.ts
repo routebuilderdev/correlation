@@ -10,6 +10,14 @@
  * hands out 10 NEAR per account, so a 100 NEAR pool cannot exist. Re-running is
  * safe — the signer and swarm are idempotent, a policy whose window has closed
  * is retired first, and nothing is bought while a live policy is still open.
+ *
+ * Flags for a two-policy take (the receipt keeps one entry per policy and agent,
+ * so each demonstration arm needs its own policy):
+ *
+ *   --new              buy a fresh policy even while one is open
+ *   --topup <NEAR>     deposit that much more LP capital into the pool
+ *   --topup-to <NEAR>  deposit whatever makes free capital reach this much
+ *   --limit <NEAR>     set the limit exactly, instead of 90% of free capital
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -74,6 +82,20 @@ function report(label: string, value: string): void {
 
 function near(yocto: bigint): string {
   return `${(Number(yocto) / Number(YOCTO)).toFixed(4)} NEAR`;
+}
+
+/** `--limit 7.1998` -> yocto, exactly: going through a float drifts by a yocto. */
+function nearFlag(flag: string): bigint | null {
+  const at = process.argv.indexOf(flag);
+  if (at === -1) return null;
+  const raw = process.argv[at + 1]?.trim();
+  const parts = raw === undefined ? null : /^(\d+)(?:\.(\d{1,24}))?$/.exec(raw);
+  if (!parts) {
+    throw new Error(`${flag} needs an amount in NEAR, like 7.1998 (got ${raw ?? "nothing"})`);
+  }
+  const value = BigInt(parts[1] ?? "0") * YOCTO + BigInt(((parts[2] ?? "") + "0".repeat(24)).slice(0, 24));
+  if (value <= 0n) throw new Error(`${flag} must be greater than zero`);
+  return value;
 }
 
 function loadSigner(): Signer {
@@ -189,6 +211,14 @@ async function main(): Promise<void> {
     report("deposit", near(amount));
   }
 
+  // An explicit top-up: the first policy of a take has already committed most of
+  // the pool, and every later limit is computed from what is left free.
+  const topup = nearFlag("--topup");
+  if (topup) {
+    await call(lp, "deposit", { pool_id: 1 }, { deposit: topup, gas: 50n * TGAS });
+    report("topup", near(topup));
+  }
+
   // 3. The swarm. Anyone may register one; the fingerprint is what matters.
   await call(
     buyer,
@@ -208,25 +238,57 @@ async function main(): Promise<void> {
   // 4. The policy. A closed window is retired (which releases its commitment);
   // an open one is reused, because buying a second policy for the same run would
   // double the commitment without adding anything to show.
-  let live: PolicyView | null = null;
+  const seen: PolicyView[] = [];
   for (let id = 1; id <= 64; id += 1) {
     const policy = await view<PolicyView>(buyer, "get_policy", { policy_id: id });
     if (!policy) break;
-    live = policy;
+    seen.push(policy);
   }
+  const live = seen.at(-1) ?? null;
   const now = BigInt(Date.now()) * 1_000_000n;
+
+  // A retired policy's commitment is capital that the next limit is computed
+  // from, and an Active policy whose window has closed is dead but still holds
+  // it. --new skips the reuse, never this cleanup: leaving it out bought a
+  // second demo policy with the 0.9 NEAR the first one had not committed yet.
+  for (const policy of seen) {
+    if (policy.status !== "Active") continue;
+    if (now < BigInt(policy.window_end_ns) + GRACE_NS) continue;
+    await call(buyer, "expire", { policy_id: policy.policy_id }, { gas: 50n * TGAS });
+    report("expire", `#${policy.policy_id} (window closed)`);
+  }
 
   const forceNew = process.argv.includes("--new");
   if (live && live.status === "Active" && !forceNew) {
-    const closes = BigInt(live.window_end_ns) + GRACE_NS;
-    if (now < closes) {
+    if (now < BigInt(live.window_end_ns) + GRACE_NS) {
       report("policy", `#${live.policy_id} still open, reusing it`);
       report("window", `${new Date(live.window_end_ns / 1e6).toISOString()} (${live.limit} limit)`);
       printSummary(await view<PoolView>(owner, "get_pool", { pool_id: 1 }), live);
       return;
     }
-    await call(buyer, "expire", { policy_id: live.policy_id }, { gas: 50n * TGAS });
-    report("expire", `#${live.policy_id} (window closed)`);
+    // Retired by the loop above.
+  }
+
+  // Fund to an exact amount of *free* capital, after the stale commitments are
+  // released: this is the only place that knows both numbers, so a caller can
+  // ask for a limit and get it without guessing a top-up.
+  const topupTo = nearFlag("--topup-to");
+  if (topupTo) {
+    const pool = await view<PoolView>(owner, "get_pool", { pool_id: 1 });
+    const free = BigInt(pool?.available ?? "0");
+    if (free < topupTo) {
+      const amount = topupTo - free;
+      const balance = await lp.getBalance();
+      if (balance < amount + RESERVE) {
+        throw new Error(
+          `free capital is ${near(free)} and reaching ${near(topupTo)} needs ${near(amount)} more, but ${LP_ACCOUNT} holds ${near(balance)} (keeping ${near(RESERVE)} for gas)`,
+        );
+      }
+      await call(lp, "deposit", { pool_id: 1 }, { deposit: amount, gas: 50n * TGAS });
+      report("topup", `${near(amount)} (free capital to ${near(topupTo)})`);
+    } else {
+      report("topup", `free capital already ${near(free)}`);
+    }
   }
 
   const windowStart = (now / 1_000_000_000n) * 1_000_000_000n + WINDOW_LEAD_NS;
@@ -237,8 +299,19 @@ async function main(): Promise<void> {
   // exhausted by one policy.
   const free = BigInt((await view<PoolView>(owner, "get_pool", { pool_id: 1 }))?.available ?? "0");
   const cap = (free * 9n) / 10n;
-  const limit = free < cap ? free : cap;
+  let limit = free < cap ? free : cap;
   if (limit < PREMIUM) throw new Error(`only ${near(free)} free in the pool; deposit more capital`);
+  // An explicit limit keeps a second policy's payout identical to the first.
+  // Refuse loudly rather than silently shrinking it: the number appears on film.
+  const requested = nearFlag("--limit");
+  if (requested) {
+    if (requested > free) {
+      throw new Error(
+        `--limit ${near(requested)} does not fit ${near(free)} of free capital; add ${near(requested - free)} with --topup, or pass --topup-to ${near(requested)}`,
+      );
+    }
+    limit = requested;
+  }
 
   const termsJson = JSON.stringify({
     limit: limit.toString(),

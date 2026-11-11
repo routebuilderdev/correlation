@@ -6,7 +6,7 @@ import { sha256Hex } from "@correlation/shared";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { config } from "./config.ts";
-import { loadRun, saveRun } from "./store.ts";
+import { latestRunFor, loadRun, saveRun } from "./store.ts";
 import { runSwarm, type AgentResult, type SwarmOptions } from "./swarm/agents.ts";
 
 export interface Run {
@@ -24,6 +24,8 @@ export interface Run {
 export interface Deps {
   runSwarm: (options: SwarmOptions) => Promise<AgentResult[]>;
   submitReceipt: (result: AgentResult, policyId: number) => Promise<string>;
+  /** Asks the contract, after a failed send, whether the receipt landed anyway. */
+  receiptPosted?: (policyId: number, agentId: string) => Promise<boolean>;
   evaluate: (policyId: number) => Promise<string>;
   claim: (policyId: number) => Promise<string>;
   policyView: (policyId: number) => Promise<unknown>;
@@ -74,6 +76,24 @@ export function buildServer(deps: Deps): FastifyInstance {
     reply.header("access-control-allow-methods", "GET,POST,OPTIONS");
     if (request.method === "OPTIONS") return reply.status(204).send();
   });
+
+  /**
+   * What the contract says about a policy, as a run status.
+   *
+   * `evaluate` returns successfully whether or not the index crossed the
+   * trigger — it records the index either way. Labelling every finished
+   * evaluate "triggered" put the word next to a 0% gauge on the control arm,
+   * which contradicts the chain the whole demo is about. Anything unreadable is
+   * "complete": a run must never claim a payout the chain did not make.
+   */
+  const chainStatus = async (policyId: number): Promise<Run["status"]> => {
+    try {
+      const view = (await deps.policyView(policyId)) as { policy?: { status?: unknown } } | null;
+      return view?.policy?.status === "Triggered" ? "triggered" : "complete";
+    } catch {
+      return "complete";
+    }
+  };
 
   /** A caller that names no policy gets the newest one on the contract. */
   const resolvePolicyId = async (requested?: number): Promise<number> => {
@@ -133,6 +153,45 @@ export function buildServer(deps: Deps): FastifyInstance {
       // Fire and forget: the UI polls. A judge must see cells fill in.
       void (async () => {
         try {
+          // Post each receipt the moment its agent settles, so the on-chain
+          // index climbs while the arm is running instead of jumping once at
+          // the end. The contract's nullifier (policy_id, agent_id,
+          // window_start_ns) is a natural idempotency key: repeating a post is
+          // safe, and E14 DUPLICATE proves the first one landed. Retrying an
+          // ambiguous send is therefore the correct move, not a risky one.
+          const posting = new Map<string, Promise<void>>();
+          const post = (result: AgentResult): Promise<void> => {
+            if (!result.signature) return Promise.resolve();
+            const already = posting.get(result.agentId);
+            if (already) return already;
+            const attempt = (async () => {
+              try {
+                run.txHashes[result.agentId] = await deps.submitReceipt(result, policyId);
+                // A later attempt landed: the earlier "E-submit" line is history,
+                // not the receipt's state. "wrong answer" is the receipt's own
+                // verdict and stays.
+                if (run.results[result.index]?.error?.startsWith("E-submit:")) {
+                  run.results[result.index]!.error = null;
+                }
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                // A send that failed on the wire may still have landed, and the
+                // contract's rejections are all opaque `WebAssembly trap`s, so
+                // ask the chain instead of reading the error string.
+                const landed = await deps
+                  .receiptPosted?.(policyId, result.agentId)
+                  .catch(() => false);
+                if (!landed && !/E14|E05|DUPLICATE/.test(message)) {
+                  run.results[result.index]!.error = `E-submit: ${message.slice(0, 160)}`;
+                }
+              } finally {
+                posting.delete(result.agentId);
+              }
+            })();
+            posting.set(result.agentId, attempt);
+            return attempt;
+          };
+
           run.results = await deps.runSwarm({
             policyId,
             windowStartNs: BigInt(Date.now()) * 1_000_000n,
@@ -142,27 +201,23 @@ export function buildServer(deps: Deps): FastifyInstance {
             // page should see twenty results arrive, not one jump at the end.
             onAgent: (result) => {
               run.results[result.index] = result;
+              void post(result);
             },
           });
-          run.status = "complete";
+          await Promise.all([...posting.values()]);
 
-          const accepted = run.results.filter((r) => r.signature);
-          for (const result of accepted) {
-            try {
-              run.txHashes[result.agentId] = await deps.submitReceipt(result, policyId);
-            } catch (error) {
-              // A duplicate receipt is a success: the nullifier already recorded it.
-              const message = error instanceof Error ? error.message : String(error);
-              if (!/E05|DUPLICATE/.test(message)) {
-                run.results[result.index]!.error = `E-submit: ${message.slice(0, 160)}`;
-              }
-            }
+          // One more pass over anything still unposted. A missing receipt is a
+          // real failure; a duplicate is not, so the retry cannot hurt.
+          for (const result of run.results) {
+            if (result?.signature && !run.txHashes[result.agentId]) await post(result);
           }
+          await Promise.all([...posting.values()]);
+          run.status = "complete";
 
           run.status = "evaluating";
           try {
             run.evaluateTx = await deps.evaluate(policyId);
-            run.status = "triggered";
+            run.status = await chainStatus(policyId);
           } catch (error) {
             run.error = error instanceof Error ? error.message : String(error);
             run.status = "complete";
@@ -211,7 +266,7 @@ export function buildServer(deps: Deps): FastifyInstance {
     };
     const send = () => {
       reply.raw.write(`data: ${JSON.stringify(publicRun(run))}\n\n`);
-      if (run.status === "triggered" || run.status === "error") {
+      if (run.status === "triggered" || run.status === "complete" || run.status === "error") {
         stop();
         reply.raw.end();
       }
@@ -228,6 +283,22 @@ export function buildServer(deps: Deps): FastifyInstance {
     if (run) return publicRun(run);
     const recorded = await loadRun<unknown>(request.params.id);
     if (!recorded) return reply.status(404).send({ error: "unknown run" });
+    return recorded;
+  });
+
+  // What a reload shows: the newest run recorded for this policy, live one
+  // first so a page opened mid-run keeps following it.
+  app.get<{ Params: { id: string } }>("/api/policy/:id/run", async (request, reply) => {
+    const policyId = Number(request.params.id);
+    if (!Number.isInteger(policyId) || policyId <= 0) {
+      return reply.status(400).send({ error: "policy id must be a positive integer" });
+    }
+    const live = [...runs.values()]
+      .filter((run) => run.policyId === policyId)
+      .sort((left, right) => (left.startedAt > right.startedAt ? -1 : 1))[0];
+    if (live) return publicRun(live);
+    const recorded = await latestRunFor<unknown>(policyId);
+    if (!recorded) return reply.status(404).send({ error: "no run recorded for this policy" });
     return recorded;
   });
 
@@ -260,6 +331,7 @@ async function main(): Promise<void> {
         responseBytes: result.responseBytes,
         signatureJson: JSON.stringify(result.signature),
       }),
+    receiptPosted: chain.receiptPosted,
     evaluate: chain.evaluate,
     claim: chain.claim,
     policyView: chain.policyView,
