@@ -39,7 +39,7 @@ node -e 'console.log(crypto.randomUUID())'
 > the model's TEE; the buyer submits the raw request and response bytes, and the NEAR contract
 > re-derives the expected task input, rebuilds the signed text, recovers the signer and recomputes
 > the arithmetic itself. Twenty signed receipts produce an index, the index crosses the threshold,
-> and the contract pays. Proven on testnet: twenty agents, nineteen failures, 9500 bps against a
+> and the contract pays. Proven on testnet: twenty agents, eighteen failures, 9000 bps against a
 > 2500 bps trigger, 7.83 NEAR paid automatically; the same fleet on a clean context the same day
 > missed once in twenty. NEAR makes this cheap and trustless: verification
 > costs fractions of a cent, receipts are final in seconds, and the payout cannot be stopped by
@@ -57,7 +57,7 @@ node -e 'console.log(crypto.randomUUID())'
 > signed inside the model's TEE, and the contract re-verifies the bytes, recovers the signer and
 > recomputes the arithmetic on chain.
 >
-> Testnet run: 20 agents, 19 wrong answers, 9500 bps index, 7.83 NEAR paid out. The clean control
+> Testnet run: 20 agents, 18 wrong answers, 9000 bps index, 7.83 NEAR paid out. The clean control
 > arm the same day missed once in twenty — 500 bps, under the trigger, no payout.
 >
 > @NEARProtocol #NEARHackathon — repo + video in the reply.
@@ -80,8 +80,9 @@ node -e 'console.log(crypto.randomUUID())'
 ## Not done yet
 
 The demo video is recorded: `film/correlation-demo.mp4`, 60.5s, 720p, silent, captioned in-page.
-It shows policy P-017 (control: 20 receipts, 1 failed, 500 bps, no payout) and P-018 (poisoned: 20
-receipts, 19 failed, 9500 bps, 7.8284 NEAR paid to the buyer).
+It shows policy P-019 (control: 20 receipts, 1 failed, 500 bps, no payout) and P-020 (poisoned: 20
+receipts, 18 failed, 9000 bps, 7.8284 NEAR paid to the buyer; claim
+`861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t`).
 
 Still yours alone: the six form values, the X post, and a public repository (`projectUrl`) — the
 repository has no remote yet, so nothing is pushed.

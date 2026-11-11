@@ -879,7 +879,7 @@ async function take() {
   // of visible filling instead of a jump cut that looks like nothing happened.
   await caption(
     "STEP 3 / 10 · CONTROL ARM · 20 AGENTS",
-    "Answers land two at a time, each one posted to the contract. Sped up from about four minutes.",
+    "Answers land two at a time, each one posted to the contract.",
   );
   // The grid is the shot. The band owns the bottom of the frame, so the page is
   // scrolled to it: its last row lands just above the band instead of behind it.
@@ -952,7 +952,7 @@ async function take() {
 
   await caption(
     "STEP 6 / 10 · POISONED ARM · 20 AGENTS",
-    "The same fleet on the poisoned context, answers landing two at a time. Sped up from about half an hour.",
+    "The same fleet on the poisoned context, answers landing two at a time.",
   );
   await scrollTo("Swarm", { prefix: true });
   await startSegment("06b-poisoned-run", { timelapse: true });

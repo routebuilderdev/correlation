@@ -1,11 +1,20 @@
 const YOCTO = 1_000_000_000_000_000_000_000_000n;
 
-/** u128 arrives as a string; never `Number(...)` an amount. */
+/**
+ * u128 arrives as a string; never `Number(...)` an amount.
+ *
+ * Four decimals with trailing zeros trimmed, so a 7.8284 NEAR limit is not
+ * printed as 7.828 beside a caption that says 7.8284: the panel and the caption
+ * have to name the same number.
+ */
 export function formatNear(yocto: string | bigint): string {
   const value = typeof yocto === "bigint" ? yocto : BigInt(yocto);
   const whole = value / YOCTO;
-  const fraction = (value % YOCTO) / 10n ** 21n;
-  return fraction === 0n ? `${whole}` : `${whole}.${fraction.toString().padStart(3, "0")}`;
+  const fraction = ((value % YOCTO) / 10n ** 20n)
+    .toString()
+    .padStart(4, "0")
+    .replace(/0+$/, "");
+  return fraction === "" ? `${whole}` : `${whole}.${fraction}`;
 }
 
 export function shortHash(value: string | null | undefined, size = 4): string {

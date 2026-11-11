@@ -24,10 +24,17 @@ This is not a plan: policy #3 on `correlation.testnet` ran the whole path with l
 Every number above comes from a signed receipt: the contract rejected nothing it could not verify, and
 the payout is the contract's arithmetic, not the orchestrator's claim.
 
-The video was filmed on a later pair, and the split is not identical run to run: P-017 control (20
-receipts, 1 failed, 500 bps, no payout) and P-018 poisoned (20 receipts, 19 failed, 9500 bps, 7.8284
-NEAR paid). Temperature 0 does not make a hosted reasoning model deterministic, so the arms are
-reported as measured, never as expected.
+The video was filmed on a later pair, and the split is not identical run to run: P-019 control (20
+receipts, 1 failed, 500 bps, no payout) and P-020 poisoned (20 receipts, 18 failed, 9000 bps, 7.8284
+NEAR paid, claim
+[861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t](https://testnet.nearblocks.io/txns/861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t)).
+Temperature 0 does not make a hosted reasoning model deterministic, so the arms are reported as
+measured, never as expected.
+
+Two things on screen invite a second look and are deliberate. `evaluate` runs after every arm,
+including the control: the contract decides, so a below-trigger index leaves the policy `Active`. And
+a receipt row shows `—` under `Tx` until its post lands, because an answer is signed before it is
+written on chain.
 
 ## Quick start
 
