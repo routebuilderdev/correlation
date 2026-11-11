@@ -3,7 +3,7 @@
 **Status:** Ready to build (one blocking credential)
 **Written:** 2026-11-09
 **Deadline:** 2026-11-14T23:59:00Z — five days
-**Repo:** `/home/ubuntu/Code/NEAR_hackathon_2026`
+**Repo:** this repository
 **Scope:** self-contained build plan — what to build and how
 
 This is the build document. It is prescriptive on purpose: names, files, interfaces, order, acceptance criteria. It is the single source of truth; §1.1 records the assumptions it supersedes.
@@ -164,7 +164,7 @@ That last row matters. It means the contract's trust root must be a pinned 64-by
 | Rust / Cargo | 1.93.1 |
 | Python | 3.12.3 |
 | Docker | 29.9.2 |
-| pnpm | `/home/ubuntu/.local/bin/pnpm` |
+| pnpm | `pnpm` (on `PATH`) |
 | `cargo-near` | **not installed** — `cargo install cargo-near` (5–10 min) |
 | `near` CLI | **not installed** — needed for account creation |
 | Contract SDK | `near-sdk = "5.30"` |

@@ -30,3 +30,6 @@ spike/out/
 
 # recorded demo footage and captures
 /film/
+
+# local tooling (secret scanners and the like)
+/.tools/
