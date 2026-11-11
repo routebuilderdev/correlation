@@ -44,7 +44,7 @@ Chrome removes the class of mistake instead of asking the operator to remember i
    commits 7.8284 NEAR, free capital is ~0.8, so a second seed would buy 0.8 NEAR of cover. The
    seeder now retires Active policies whose window has closed, and `--limit 7.8284 --topup-to 8.63`
    funds the pool to an exact free amount, so both policies read 7.8284 NEAR — the number the
-   README, `SUBMISSION.md` and the closing card quote.
+   README and the closing card quote.
 4. **`claim` pays the policy's own commitment, not the pool's free balance.** `backing = total −
    (committed − limit)`, so a topped-up pool pays the full limit even while another policy is still
    open. No top-up, and the payout would have been capped below the quoted number.
@@ -93,7 +93,7 @@ Also look at `film/probe.png`: one still of the viewport, written at startup. `S
 ./scripts/film.sh check` records the same beats at 100% for comparison — 1.25 is the default because
 the table's 12 px type is too small at 1×.
 
-Delete `film/` afterwards if you want the paid take to be the only thing on disk.
+`film/` can be deleted afterwards, leaving the finished take as the only thing on disk.
 
 ## 2. The take
 
@@ -131,9 +131,8 @@ something is off. `MAX_SECONDS=140` is the default.
 
 ## 5. The post
 
-The human posts it: video attached, text from `SUBMISSION.md`, `@NEARProtocol` and `#NEARHackathon`
-in it, repo link in the reply. `demoUrl` is that post and it has to exist before the submission is
-sent.
+Posted with the video attached, `@NEARProtocol` and `#NEARHackathon` in the text and the repo link
+in the first reply. That post is `demoUrl`, and it has to exist before the submission is sent.
 
 ## If the model is unreachable on the day
 

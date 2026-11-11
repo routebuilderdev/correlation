@@ -1,34 +1,35 @@
 # Submission
 
-Status: **not sent**. Six values below are yours alone — the form refuses placeholders, and the API
-accepts one submission per repository, so nothing is sent until you have confirmed the exact payload.
+Status: **not sent**. Four values are supplied at send time — lead name, email, team size and a
+mainnet payout account. The form refuses placeholders and the API accepts one submission per
+repository, so the payload is assembled once and checked before it goes.
 
 Deadline: **2026-11-14T23:59:00Z**. Endpoint: `POST https://nearhackathon.com/api/applications`.
 Form equivalent: https://nearhackathon.com/#apply
 
-## What only you can supply
+## Form fields
 
 | Field | Rule | Value |
 |---|---|---|
-| `leadName` | 2–80 chars | _your name_ |
-| `email` | valid, max 160, ≤ 2 submissions per email | _your email_ |
-| `size` | exactly one of `1`, `2 - 4`, `4 - 6`, `6 - 8`, `8+` | _team size_ |
-| `nearAddress` | **mainnet** named account (`you.near`) or 64-char implicit — never invented | _payout account_ |
+| `leadName` | 2–80 chars | _supplied at send time_ |
+| `email` | valid, max 160, ≤ 2 submissions per email | _supplied at send time_ |
+| `size` | exactly one of `1`, `2 - 4`, `4 - 6`, `6 - 8`, `8+` | _supplied at send time_ |
+| `nearAddress` | **mainnet** named account (`name.near`) or 64-char implicit — never invented | _supplied at send time_ |
 | `projectUrl` | public repository, submitted once only | https://github.com/routebuilderdev/correlation |
-| `demoUrl` | public X post, written and published by you | https://x.com/routebuilderdev/status/2120637879496151410 |
+| `demoUrl` | public X post carrying the video | https://x.com/routebuilderdev/status/2120637879496151410 |
 
-`projectName`: `Correlation`. `tracks`: `["swarms", "security", "privacy"]` — primary is the swarm
-track; the security track fits because the mechanism is a proof, not a promise; privacy because the
-receipts are verified inside a TEE. Drop any that overstate the fit.
+`projectName`: `Correlation`. `tracks`: `["swarms", "security", "privacy"]` — the swarm track is the
+primary one; security fits because the mechanism is a proof rather than a promise, privacy because
+the receipts are verified inside a TEE.
 
-`requestId`: generate once, reuse on every retry (a retry after a network error must not look like a
-second submission):
+`requestId`: generated once and reused on every retry, so a retry after a network error does not
+look like a second submission:
 
 ```bash
 node -e 'console.log(crypto.randomUUID())'
 ```
 
-## The description (paste as `idea`, 1,184 characters, limit 2,000)
+## Description sent as `idea` (1,184 characters, limit 2,000)
 
 > Agent fleets fail together: one shared model, one shared context, one bad instruction, and twenty
 > agents get the same task wrong at the same moment. Nobody insures that, because the loss is
@@ -45,29 +46,31 @@ node -e 'console.log(crypto.randomUUID())'
 > costs fractions of a cent, receipts are final in seconds, and the payout cannot be stopped by
 > anyone holding the keys.
 
-## The X post (you publish it, I cannot)
+## The post, published 2026-11-11
 
-> Twenty agents, one shared model, one shared prompt — they all fail at once. Nobody insures a fleet
-> failing together, because the loss looks like twenty unrelated mistakes.
+267 weighted characters, video attached, alt text on the video.
+
+> One sentence in the shared prompt. 18 of 20 agents returned the same wrong number.
+> Control: 1 of 20. Nothing.
+> A NEAR contract verified the signed receipts on-chain and paid out 7.8284 NEAR by itself.
+> NEAR HACKATHON @NEARProtocol #NEARHackathon
+> https://github.com/routebuilderdev/correlation
+
+First reply, carrying the control arm and the payout transaction:
+
+> Same day, same model, control arm: 1 failure in 20 — 500 bps, under the
+> 2500 trigger, no payout.
 >
-> I built Correlation at NEAR HACKATHON: an LP funds a pool, a buyer pays a premium, and if enough
-> agents fail the same task the payout fires automatically.
+> 18 of 20 vs 1 of 20. The only difference is one sentence of context.
 >
-> The part that matters: the contract does not trust my orchestrator. Each agent's call comes back
-> signed inside the model's TEE, and the contract re-verifies the bytes, recovers the signer and
-> recomputes the arithmetic on chain.
+> Payout: testnet.nearblocks.io/txns/861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t
 >
-> Testnet run: 20 agents, 18 wrong answers, 9000 bps index, 7.83 NEAR paid out. The clean control
-> arm the same day missed once in twenty — 500 bps, under the trigger, no payout.
->
-> @NEARProtocol #NEARHackathon — repo + video in the reply.
-> Feedback welcome: would you underwrite an agent fleet?
+> What failure would you want covered first?
 
 ## Pre-flight, before the payload is sent
 
-- [ ] Research docs (`COMPETITIVE_ANALYSIS.md`, `CORRELATION_RESEARCH.md`, `JUDGE_DEEP_DIVE.md`,
-      `NEAR hackathon research.md`) stay out of the published tree — they are excluded in
-      `.git/info/exclude`, untracked, and must remain so.
+- [ ] Research notes stay out of the published tree — excluded in `.git/info/exclude`, untracked,
+      and not to be added.
 - [ ] The abandoned `correlation/` scaffold stays untracked (`/correlation/` in `.gitignore`).
 - [ ] No secrets in history: only `.env.example` is tracked.
 - [ ] `README.md` renders the run that actually happened, with the contract address.
@@ -75,15 +78,16 @@ node -e 'console.log(crypto.randomUUID())'
 - [x] Repository public before 2026-11-14T23:59:00Z.
 - [x] Demo post live with video attached: https://x.com/routebuilderdev/status/2120637879496151410
 - [ ] Payload under 12,000 bytes, no `website` field.
-- [ ] Print the full JSON and get a yes before `curl`.
+- [ ] Payload checked against the form rules before sending.
 
-## Not done yet
+## What the run recorded
 
-The demo video is recorded: `film/correlation-demo.mp4`, 60.5s, 720p, silent, captioned in-page.
-It shows policy P-019 (control: 20 receipts, 1 failed, 500 bps, no payout) and P-020 (poisoned: 20
-receipts, 18 failed, 9000 bps, 7.8284 NEAR paid to the buyer; claim
+The demo video is `film/correlation-demo.mp4`, 60.5 s, 720p, silent, captioned in-page. It shows
+policy P-019 (control: 20 receipts, 1 failed, 500 bps, no payout) and P-020 (poisoned: 20 receipts,
+18 failed, 9000 bps, 7.8284 NEAR paid to the buyer; claim
 `861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t`).
 
-Done: the repository is pushed, public and licensed AGPL-3.0, and the demo post is live.
+Both policies are readable from `correlation.testnet` with `get_policy`, so the numbers on screen
+can be checked against the chain rather than taken from this file.
 
-Still yours alone: the six form values, and sending the payload.
+Remaining work: the four send-time values, and the `POST` itself.
