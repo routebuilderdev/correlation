@@ -209,7 +209,7 @@ buys a fresh policy regardless, which is what a second demo run needs.
 |---|---|---|
 | `contract` (Rust) | 42 | signature path, policy terms, pool limits, receipts (bare + envelope verdicts), index, claim, expiry, full 20-receipt run |
 | `shared` | 10 | cross-language vectors pinned to the Rust fixture |
-| `api` | 18 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim, a full offline 20-agent run |
+| `api` | 22 | exact bytes, required headers, verifier parity incl. error codes, HTTP states, claim, a full offline 20-agent run |
 
 `shared` and `api` deliberately assert the *same* error codes as the contract (`E07`, `E09`, `E10`,
 `E11`), so a divergence shows up as a failing test instead of a silent client-only pass.
