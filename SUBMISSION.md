@@ -14,8 +14,8 @@ Form equivalent: https://nearhackathon.com/#apply
 | `email` | valid, max 160, ≤ 2 submissions per email | _your email_ |
 | `size` | exactly one of `1`, `2 - 4`, `4 - 6`, `6 - 8`, `8+` | _team size_ |
 | `nearAddress` | **mainnet** named account (`you.near`) or 64-char implicit — never invented | _payout account_ |
-| `projectUrl` | public repository, submitted once only | _repo URL once pushed_ |
-| `demoUrl` | public X post, written and published by you | _post URL_ |
+| `projectUrl` | public repository, submitted once only | https://github.com/routebuilderdev/correlation |
+| `demoUrl` | public X post, written and published by you | https://x.com/routebuilderdev/status/2120637879496151410 |
 
 `projectName`: `Correlation`. `tracks`: `["swarms", "security", "privacy"]` — primary is the swarm
 track; the security track fits because the mechanism is a proof, not a promise; privacy because the
@@ -72,8 +72,8 @@ node -e 'console.log(crypto.randomUUID())'
 - [ ] No secrets in history: only `.env.example` is tracked.
 - [ ] `README.md` renders the run that actually happened, with the contract address.
 - [ ] `LICENSE` present (AGPL-3.0).
-- [ ] Repository public before 2026-11-14T23:59:00Z.
-- [ ] Demo post live with video attached, before submitting, so `demoUrl` is real.
+- [x] Repository public before 2026-11-14T23:59:00Z.
+- [x] Demo post live with video attached: https://x.com/routebuilderdev/status/2120637879496151410
 - [ ] Payload under 12,000 bytes, no `website` field.
 - [ ] Print the full JSON and get a yes before `curl`.
 
@@ -84,5 +84,6 @@ It shows policy P-019 (control: 20 receipts, 1 failed, 500 bps, no payout) and P
 receipts, 18 failed, 9000 bps, 7.8284 NEAR paid to the buyer; claim
 `861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t`).
 
-Still yours alone: the six form values, the X post, and a public repository (`projectUrl`) — the
-repository has no remote yet, so nothing is pushed.
+Done: the repository is pushed, public and licensed AGPL-3.0, and the demo post is live.
+
+Still yours alone: the six form values, and sending the payload.

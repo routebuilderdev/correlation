@@ -9,6 +9,10 @@ The point is not that an agent failed. It is that *the swarm* failed together, a
 provable without trusting an oracle: the contract re-derives the expected task input, rebuilds the
 signed text from the raw request and response bytes, and recovers the signer key on chain.
 
+## Demo
+
+Sixty seconds of the app paying out: [the demo post](https://x.com/routebuilderdev/status/2120637879496151410).
+
 ## Proven on testnet
 
 This is not a plan: policy #3 on `correlation.testnet` ran the whole path with live traffic.
