@@ -51,6 +51,11 @@ Note on that last clause, for the record: `claim` asserts the contract is not pa
 cannot redirect one — the payee and the amount are fixed when the policy is bought — and no key
 other than the owner's can block the claim path.
 
+One related gap, left unpatched for this submission: a receipt is bound to its policy only through
+the derived task input `n`, which repeats every 1,000 policy ids, so a receipt posted under one
+policy would also verify under another whose id is 1,000 away; the nullifier is per policy and does
+not catch that, and binding the policy id itself into the signed text needs a contract change.
+
 ## The post, published 2026-11-11
 
 267 weighted characters, video attached, alt text on the video.

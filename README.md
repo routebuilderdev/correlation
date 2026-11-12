@@ -156,9 +156,9 @@ T3 against bytes the model TEE actually signed.
 
 1. Open `http://localhost:5173`. The page asks the contract which policy is newest and drives that
    one, so a freshly seeded policy needs no configuration; `?policy=3` pins an older one. The panel
-   shows the limit, premium, 2500 bps trigger and the model `z-ai/glm-5.3-flash`. All twenty agents
-   must post a receipt before the index counts at all, so a partial panel never pays out on a
-   fraction of the fleet. The numbers come from what the pool actually holds: the seed script
+   shows the limit, premium, 2500 bps trigger and the model `z-ai/glm-5.3-flash`. On these terms all
+   twenty agents must post a receipt before the index counts at all, so a partial panel never pays
+   out on a fraction of the fleet. The numbers come from what the pool actually holds: the seed script
    deposits whatever the LP account holds above a gas reserve and writes a 0.1 NEAR premium against
    a limit of 90% of the free capital. When the window has closed the run buttons disable
    themselves, because a receipt posted outside the window is rejected for the wrong reason.
@@ -210,9 +210,10 @@ the demo script:
                                                                         └──────────────────┘
 ```
 
-The chain stores raw bytes, not a verdict, because a stored verdict is an oracle trust assumption
-with extra steps. Anyone can replay a receipt offline: same bytes, same model id, same signature,
-same recovery (`shared/` is a mirror of `contract/src/verify.rs`).
+The chain stores the two hashes and the boolean, not the raw bytes and not a verdict: a stored
+verdict would be an oracle trust assumption with extra steps. The bytes stay in the transaction, so
+anyone can replay a receipt offline from the tx itself — same bytes, same model id, same signature,
+same recovery (`shared/` is a mirror of `contract/src/verify.rs`), which is what `verify-run` does.
 
 ## What is proven
 
@@ -236,11 +237,27 @@ same recovery (`shared/` is a mirror of `contract/src/verify.rs`).
   mechanism, not of the loss distribution.
 - **No loss history.** There is no actuarial model behind the premium; it is a round number chosen
   so the demo is legible, not a price.
-- **TEE attestation is checked once per signer per day**, not per receipt. It answers "is this the
-  model it claims to be", not "did this specific call happen".
+- **Attestation is recorded, not enforced.** The evidence fields are written when the owner registers
+  a signer, and the contract never reads them again — not the expiry, not the measurements. The
+  seeded registration even uses placeholder hashes and no expiry. The pinned key does match the
+  model's live public attestation report, but nothing on chain re-checks freshness, so the trust
+  anchor for "which enclave signed this" is the owner's registration, not the quote.
+- **A receipt is bound to a policy only through its task input.** The policy id reaches the signed
+  text only as `n`, which repeats every 1,000 policy ids, so a receipt for one policy would also
+  verify under another whose id is 1,000 away — the nullifier is per policy and does not catch
+  that, and closing it means putting the policy id itself into the signed text, which needs a
+  contract change.
 - **Testnet only.** No real funds, no audits, no upgrade path, single pool (`pool_id = 1`).
-- **The poisoned arm is staged on purpose** — that is the experiment. A production insurer would
-  need a task the buyer cannot choose.
+- **The poisoned arm is staged on purpose** — that is the experiment. The buyer also sets the
+  terms: premium, limit, trigger and `min_agents`. The contract checks only that the premium was
+  paid and that the coverage fits inside the pool, so there is no risk-based pricing and no floor,
+  and a cheap policy with a buyer-chosen task can be made to pay out by construction. A production
+  insurer would need a task and a price the buyer cannot choose.
+- **The pool has no LP shares.** `withdraw` is permissionless: once no policy is active, anyone can
+  take the free capital, and it is paid to whoever called. This is a single-operator testnet pool,
+  not a fund.
+- **The policy NFT does not move.** `nft_token` is a view and there is no transfer method, so
+  `frozen` is a flag nothing can act on. It records the purchase; it is not a position you can sell.
 
 ## Testnet accounts
 

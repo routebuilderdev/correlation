@@ -209,6 +209,17 @@ async function main(): Promise<void> {
     `contract says ${policy.failed} failed of ${policy.started}, status ${policy.status}`,
   );
 
+  // The printed comparison is the point: a disagreement with the chain is a
+  // failure, not a footnote.
+  if (failedAgents !== policy.failed) {
+    console.log(`MISMATCH: ${failedAgents} failed here, contract says ${policy.failed}`);
+    process.exitCode = 1;
+  }
+  if (checked !== policy.started) {
+    console.log(`MISMATCH: ${checked} verified here, contract says ${policy.started} started`);
+    process.exitCode = 1;
+  }
+
   if (mismatched > 0) process.exitCode = 1;
   if (checked !== posted) process.exitCode = 1;
 }
