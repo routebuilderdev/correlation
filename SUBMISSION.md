@@ -46,6 +46,11 @@ node -e 'console.log(crypto.randomUUID())'
 > costs fractions of a cent, receipts are final in seconds, and the payout cannot be stopped by
 > anyone holding the keys.
 
+Note on that last clause, for the record: `claim` asserts the contract is not paused, and
+`set_paused` is owner-only, so the owner of `correlation.testnet` can delay a payout. The owner
+cannot redirect one — the payee and the amount are fixed when the policy is bought — and no key
+other than the owner's can block the claim path.
+
 ## The post, published 2026-11-11
 
 267 weighted characters, video attached, alt text on the video.

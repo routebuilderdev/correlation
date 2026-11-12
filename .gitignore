@@ -1,6 +1,8 @@
 # dependencies
 node_modules/
-api/.runs/
+api/.runs/*
+# one recorded run is committed so the swarm grid renders without keys or a live model
+!api/.runs/run-mwcfqpck-zq6c.json
 .pnpm-store/
 
 # build output

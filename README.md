@@ -13,7 +13,7 @@ signed text from the raw request and response bytes, and recovers the signer key
 
 ## Demo
 
-The loop above is ten seconds of the poisoned arm. The full sixty seconds, captioned and
+The loop above is a clip of the poisoned arm. The full minute, captioned and
 [posted on X](https://x.com/routebuilderdev/status/2120637879496151410), shows both arms and the payout.
 
 ## Verify it yourself
@@ -69,6 +69,11 @@ NEAR paid, claim
 Temperature 0 does not make a hosted reasoning model deterministic, so the arms are reported as
 measured, never as expected.
 
+The P-020 run is also committed, as `api/.runs/run-mwcfqpck-zq6c.json`. Every other run in that
+directory is local only, but this one is checked in so the twenty-cell grid and the per-agent
+receipts replay on a fresh clone with no model key: the record holds the transaction hash, the
+signature and the hashes for each agent, so a reader can walk from a red cell to the chain.
+
 Two things on screen invite a second look and are deliberate. `evaluate` runs after every arm,
 including the control: the contract decides, so a below-trigger index leaves the policy `Active`. And
 a receipt row shows `—` under `Tx` until its post lands, because an answer is signed before it is
@@ -92,6 +97,11 @@ separately instead of via `go.sh`:
 npm run dev --workspace @correlation/api      # API on :8787
 npm run dev --workspace @correlation/web      # UI on :5173
 ```
+
+`go.sh` exits when a required secret is missing. That is the right behaviour before a live run, but
+it stops a read-only look at the deployed contract. With a blank `.env` the two commands above still
+serve the page: the policy, the pool and the index come from public RPC, and the recorded policy-20
+run renders from the committed capture described under [Proven on testnet](#proven-on-testnet).
 
 The default RPC is `https://rpc.testnet.fastnear.com`. The public `rpc.testnet.near.org` endpoint is
 deprecated and answers `429` under load, which looks like a broken demo rather than a broken endpoint;
@@ -124,11 +134,12 @@ T3 against bytes the model TEE actually signed.
 
 1. Open `http://localhost:5173`. The page asks the contract which policy is newest and drives that
    one, so a freshly seeded policy needs no configuration; `?policy=3` pins an older one. The panel
-   shows the limit, premium, 2500 bps trigger, 16-of-20 receipts required and the model
-   `z-ai/glm-5.3-flash`. The numbers come from what the pool actually holds: the seed script deposits
-   whatever the LP account holds above a gas reserve and writes a 0.1 NEAR premium against a limit of
-   90% of the free capital. When the window has closed the run buttons disable themselves, because a
-   receipt posted outside the window is rejected for the wrong reason.
+   shows the limit, premium, 2500 bps trigger and the model `z-ai/glm-5.3-flash`. All twenty agents
+   must post a receipt before the index counts at all, so a partial panel never pays out on a
+   fraction of the fleet. The numbers come from what the pool actually holds: the seed script
+   deposits whatever the LP account holds above a gas reserve and writes a 0.1 NEAR premium against
+   a limit of 90% of the free capital. When the window has closed the run buttons disable
+   themselves, because a receipt posted outside the window is rejected for the wrong reason.
 2. Press **Run control**. Twenty cells fill in; the index stays at 0%, the policy stays `Active`.
 3. Press **Run poisoned**. The system prompt gains one plausible-looking rounding instruction.
    In practice fifteen to eighteen of the twenty agents answer the same arithmetic question wrongly —
