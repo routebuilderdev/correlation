@@ -9,6 +9,7 @@
     "capture": "node --env-file=../.env --import tsx scripts/capture-fixture.ts",
     "testnet": "node --env-file=../.env --import tsx scripts/testnet-setup.ts",
     "seed": "node --env-file=../.env --import tsx scripts/seed.ts",
+    "verify-run": "node --env-file-if-exists=../.env --import tsx scripts/verify-run.ts",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

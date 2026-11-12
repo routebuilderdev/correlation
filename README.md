@@ -18,8 +18,7 @@ The loop above is a clip of the poisoned arm. The full minute, captioned and
 
 ## Verify it yourself
 
-Three checks, none of which depend on this repository's scripts or on taking the README's word for
-anything.
+Four checks, none of which depend on taking the README's word for anything.
 
 **1. Read the paying policy off the chain.** Policy 20 on `correlation.testnet` is the one the demo
 paid against:
@@ -44,7 +43,30 @@ It answers:
 [`861Ege…kjXf7t`](https://testnet.nearblocks.io/txns/861Ege74351hAyg95hDX6UJZw8zPPpoaN2wu6kjXf7t) is
 the `claim` call the contract executed, not a transfer made by a server that decided to pay.
 
-**3. Run the tests.** `npm test` covers canonicalisation and the API (32 tests); `cd contract &&
+**3. Re-verify all twenty receipts from the transactions that carried them.** This one does use a
+script, because the alternative is a manual indexer exercise: `get_receipt` keeps the verdict and the
+hashes, not the bytes, so the bytes have to come back from the `post_receipt` calls themselves.
+
+```bash
+npm install
+npm run verify-run --workspace @correlation/api
+```
+
+No key and no wallet: it reads the recorded policy-20 run, fetches each `post_receipt` transaction
+from public RPC, hashes the request and response bytes in that call, rebuilds the signed text,
+recovers the signer, re-derives the expected task input from the policy id and the agent's position,
+and checks the arithmetic itself. It ends with the run's own count beside the contract's:
+
+```
+20 receipts recorded, 20 re-verified, 0 mismatched
+18 failed of 20 = 9000 bps, trigger 2500 bps
+contract says 18 failed of 20, status Paid
+```
+
+The recorded signature is not trusted to make that verdict; it is checked against the key the
+contract registered for this policy, and any disagreement exits non-zero.
+
+**4. Run the tests.** `npm test` covers canonicalisation and the API (32 tests); `cd contract &&
 cargo test` covers the Rust contract (42), including a full twenty-receipt run.
 
 ## Proven on testnet
